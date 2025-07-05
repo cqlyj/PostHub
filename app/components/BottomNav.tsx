@@ -31,7 +31,7 @@ const BottomNav = () => {
       {/* Add */}
       <button
         className="-mt-8 bg-[var(--primary)] w-14 h-14 rounded-full text-white flex items-center justify-center text-3xl shadow-lg border-4 border-white"
-        onClick={() => alert("Coming soon!")}
+        onClick={() => router.push("/create")}
       >
         +
       </button>
@@ -61,4 +61,4 @@ const BottomNav = () => {
   );
 };
 
-export default BottomNav; 
+export default BottomNav;
