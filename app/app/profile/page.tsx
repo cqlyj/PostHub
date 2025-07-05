@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { getAvatarSrc } from "@/utils/avatar";
 import { resolveENS } from "@/utils/ens";
 import { fetchVerification } from "@/utils/verification";
+import { useSenior } from "@/components/SeniorModeProvider";
 
 interface Post {
   id: string;
@@ -126,6 +127,8 @@ const ProfilePage: React.FC = () => {
     }
   }, [logout, router]);
 
+  const { isSenior } = useSenior();
+
   return (
     <div className="flex flex-col min-h-screen bg-[var(--muted-bg)]">
       {/* Header */}
@@ -168,7 +171,7 @@ const ProfilePage: React.FC = () => {
           <p className="text-center text-sm text-gray-500">Loading...</p>
         )}
         {!loading && tab === "posts" && (
-          <div className="grid grid-cols-2 gap-2">
+          <div className={`grid ${isSenior ? "grid-cols-1" : "grid-cols-2"} gap-2`}>
             {posts.map((p) => (
               <PostCard key={p.id} post={p} />
             ))}
@@ -178,7 +181,7 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
         {!loading && tab === "likes" && (
-          <div className="grid grid-cols-2 gap-2">
+          <div className={`grid ${isSenior ? "grid-cols-1" : "grid-cols-2"} gap-2`}>
             {likedPosts.map((p) => (
               <PostCard key={p.id} post={p} />
             ))}
@@ -190,7 +193,7 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
         {!loading && tab === "stars" && (
-          <div className="grid grid-cols-2 gap-2">
+          <div className={`grid ${isSenior ? "grid-cols-1" : "grid-cols-2"} gap-2`}>
             {starredPosts.map((p) => (
               <PostCard key={p.id} post={p} />
             ))}
