@@ -28,12 +28,56 @@ const BottomNav = () => {
         Home
       </button>
 
+      {/* Wheel */}
+      <button
+        onClick={() => router.push("/lucky")}
+        className="flex flex-col items-center text-gray-500 hover:text-[var(--primary)] text-xs"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-6 w-6 mb-0.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 3v2m0 14v2m9-9h-2M5 12H3m14.95-6.95l-1.414 1.414M6.464 17.536l-1.414 1.414m0-13.95l1.414 1.414M17.536 17.536l1.414 1.414"
+          />
+        </svg>
+        Lucky
+      </button>
+
       {/* Add */}
       <button
         className="-mt-8 bg-[var(--primary)] w-14 h-14 rounded-full text-white flex items-center justify-center text-3xl shadow-lg border-4 border-white"
         onClick={() => router.push("/create")}
       >
         +
+      </button>
+
+      {/* Notifications */}
+      <button
+        onClick={() => router.push("/notifications")}
+        className="flex flex-col items-center text-gray-500 hover:text-[var(--primary)] text-xs"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-6 w-6 mb-0.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.64 5.36 6 7.92 6 11v3.159c0 .538-.214 1.054-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+          />
+        </svg>
+        Notify
       </button>
 
       {/* Profile */}
