@@ -95,12 +95,12 @@ const Page = () => {
   return (
     <main className="min-h-screen flex items-center justify-center animated-gradient p-4 text-center">
       <div className="bg-white/70 backdrop-blur-sm px-12 py-16 rounded-xl shadow-2xl flex flex-col items-center gap-10 fade-in-up">
-        <h1 className="text-5xl md:text-7xl font-extrabold text-blue-800 tracking-tight drop-shadow-md select-none">
+        <h1 className="text-5xl md:text-7xl font-extrabold text-[var(--primary)] tracking-tight drop-shadow-md select-none">
           PostHub
         </h1>
         <button
           onClick={handleClick}
-          className="rounded-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:via-purple-700 hover:to-pink-700 active:scale-95 text-white transition-transform transform-gpu duration-200 font-semibold px-10 py-4 shadow-xl hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-purple-400"
+          className="rounded-full bg-[var(--primary)] hover:bg-red-600 active:scale-95 text-white transition-transform transform-gpu duration-200 font-semibold px-10 py-4 shadow-xl hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-red-300"
         >
           {authenticated ? "Disconnect" : "Connect"}
         </button>
