@@ -1,4 +1,6 @@
+@import "https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap";
 @import "tailwindcss";
+/* global custom styles */
 
 :root {
   --background: #ffffff;
@@ -65,4 +67,8 @@ body {
 
 .fade-in-up {
   animation: fadeInUp 1s ease-out forwards;
+}
+
+.font-hand {
+  font-family: "Patrick Hand", cursive;
 }
