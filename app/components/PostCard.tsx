@@ -4,6 +4,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getAvatarSrc } from "@/utils/avatar";
 import { resolveENS } from "@/utils/ens";
+import { isVideoUrl } from "@/utils/media";
 
 interface PostCardProps {
   post: {
@@ -17,7 +18,11 @@ interface PostCardProps {
 
 const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const hasMedia = post.media_urls && post.media_urls.length > 0;
-  const cover = hasMedia ? post.media_urls![0] : null;
+  let cover: string | null = null;
+  if (hasMedia) {
+    const videoUrl = post.media_urls!.find((u) => isVideoUrl(u));
+    cover = videoUrl ?? post.media_urls![0];
+  }
 
   const [likesCount, setLikesCount] = useState<number>(0);
   const [displayName, setDisplayName] = useState<string>("");
@@ -45,11 +50,22 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <div className="break-inside-avoid rounded-xl overflow-hidden shadow-sm hover:shadow-md transition relative bg-white">
         {cover ? (
           <div className="aspect-[3/4] flex items-center justify-center bg-gray-50">
-            <img
-              src={cover}
-              alt="cover"
-              className="max-w-full max-h-full object-contain"
-            />
+            {isVideoUrl(cover) ? (
+              <video
+                src={cover}
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="max-w-full max-h-full object-contain"
+              />
+            ) : (
+              <img
+                src={cover}
+                alt="cover"
+                className="max-w-full max-h-full object-contain"
+              />
+            )}
           </div>
         ) : (
           <div className="aspect-[3/4] flex items-center justify-center bg-gradient-to-br from-[var(--primary)]/5 to-[var(--primary)]/30 p-4">
