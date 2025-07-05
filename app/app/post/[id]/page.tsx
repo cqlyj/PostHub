@@ -1,0 +1,490 @@
+"use client";
+import React, {
+  useEffect,
+  useState,
+  use as reactUse,
+  useCallback,
+} from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { usePrivy } from "@privy-io/react-auth";
+import { getAvatarSrc } from "@/utils/avatar";
+import { resolveENS } from "@/utils/ens";
+
+const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
+  // unwrap params promise (Next.js 14)
+  const { id } = reactUse(params);
+  const router = useRouter();
+  const { user } = usePrivy();
+  interface Post {
+    id: string;
+    author: string;
+    title: string;
+    content: string;
+    created_at: string;
+    media_urls: string[];
+    is_restricted: boolean;
+    summary?: string;
+  }
+  const [post, setPost] = useState<Post | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [authorDisplayName, setAuthorDisplayName] = useState<string>("");
+  type Comment = {
+    id: string;
+    author: string;
+    content: string;
+    created_at: string;
+    parent_comment_id: string | null;
+    likes: number;
+    liked: boolean;
+  };
+
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentInput, setCommentInput] = useState("");
+  const [replyTo, setReplyTo] = useState<Comment | null>(null);
+  const [commentFiles, setCommentFiles] = useState<File[]>([]);
+
+  // interaction states
+  const [likesCount, setLikesCount] = useState(0);
+  const [starsCount, setStarsCount] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [starred, setStarred] = useState(false);
+
+  const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET ?? "post-media";
+  const COMMENT_MAX_MEDIA = 3;
+
+  const fetchComments = async () => {
+    const { data: commentRows } = await supabase
+      .from("comments")
+      .select("id,author,content,created_at,parent_comment_id")
+      .eq("post_id", id)
+      .order("created_at", { ascending: true });
+
+    if (!commentRows) return;
+
+    const enriched: Comment[] = await Promise.all(
+      commentRows.map(async (c) => {
+        const { count: likeCnt } = await supabase
+          .from("comment_likes")
+          .select("*", { head: true, count: "exact" })
+          .eq("comment_id", c.id);
+
+        let userLiked = false;
+        if (user?.wallet?.address) {
+          const { data: likeRow } = await supabase
+            .from("comment_likes")
+            .select("comment_id")
+            .eq("comment_id", c.id)
+            .eq("user_address", user.wallet.address)
+            .maybeSingle();
+          userLiked = !!likeRow;
+        }
+        return {
+          ...c,
+          likes: likeCnt ?? 0,
+          liked: userLiked,
+        } as Comment;
+      })
+    );
+    setComments(enriched);
+  };
+
+  useEffect(() => {
+    const fetch = async () => {
+      const { data, error } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (!error) {
+        setPost(data);
+        resolveENS(data.author).then((name) => {
+          setAuthorDisplayName(
+            name ?? `${data.author.substring(0, 6)}…${data.author.slice(-4)}`
+          );
+        });
+      }
+      await fetchComments();
+      setLoading(false);
+    };
+    fetch();
+  }, [id, user?.wallet?.address]);
+
+  // fetch likes / stars counts & user states
+  useEffect(() => {
+    const fetchInteraction = async () => {
+      const { count: likeCnt } = await supabase
+        .from("likes")
+        .select("*", { head: true, count: "exact" })
+        .eq("post_id", id);
+      setLikesCount(likeCnt ?? 0);
+
+      const { count: starCnt } = await supabase
+        .from("stars")
+        .select("*", { head: true, count: "exact" })
+        .eq("post_id", id);
+      setStarsCount(starCnt ?? 0);
+
+      if (user?.wallet?.address) {
+        const { data: likeRow } = await supabase
+          .from("likes")
+          .select("post_id")
+          .eq("post_id", id)
+          .eq("user_address", user.wallet.address)
+          .maybeSingle();
+        setLiked(!!likeRow);
+
+        const { data: starRow } = await supabase
+          .from("stars")
+          .select("post_id")
+          .eq("post_id", id)
+          .eq("user_address", user.wallet.address)
+          .maybeSingle();
+        setStarred(!!starRow);
+      }
+    };
+    fetchInteraction();
+  }, [id, user?.wallet?.address]);
+
+  const toggleLike = async () => {
+    if (!user?.wallet?.address) return;
+    if (liked) {
+      await supabase
+        .from("likes")
+        .delete()
+        .eq("post_id", id)
+        .eq("user_address", user.wallet.address);
+      setLiked(false);
+      setLikesCount((c) => c - 1);
+    } else {
+      await supabase.from("likes").upsert({
+        post_id: id,
+        user_address: user.wallet.address,
+      });
+      setLiked(true);
+      setLikesCount((c) => c + 1);
+    }
+  };
+
+  const toggleStar = async () => {
+    if (!user?.wallet?.address) return;
+    if (starred) {
+      await supabase
+        .from("stars")
+        .delete()
+        .eq("post_id", id)
+        .eq("user_address", user.wallet.address);
+      setStarred(false);
+      setStarsCount((c) => c - 1);
+    } else {
+      await supabase.from("stars").upsert({
+        post_id: id,
+        user_address: user.wallet.address,
+      });
+      setStarred(true);
+      setStarsCount((c) => c + 1);
+    }
+  };
+
+  const toggleCommentLike = useCallback(
+    async (commentId: string) => {
+      if (!user?.wallet?.address) return;
+      const address = user.wallet.address;
+
+      // Find the target comment to know current state
+      const target = comments.find((c) => c.id === commentId);
+      if (!target) return;
+
+      if (target.liked) {
+        // Unlike
+        await supabase
+          .from("comment_likes")
+          .delete()
+          .eq("comment_id", commentId)
+          .eq("user_address", address);
+      } else {
+        // Like
+        await supabase.from("comment_likes").upsert({
+          comment_id: commentId,
+          user_address: address,
+        });
+      }
+
+      // Refresh the list so counts persist correctly across reloads
+      fetchComments();
+    },
+    [user, comments]
+  );
+
+  const handleReply = useCallback((comment: Comment) => {
+    setReplyTo(comment);
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files ? Array.from(e.target.files) : [];
+    if (selected.length + commentFiles.length > COMMENT_MAX_MEDIA) {
+      alert(`You can attach up to ${COMMENT_MAX_MEDIA} images.`);
+      return;
+    }
+    setCommentFiles([...commentFiles, ...selected]);
+    e.target.value = ""; // reset
+  };
+
+  // helper: render comments recursively (defined before JSX return for hoisting)
+  const renderComments = (
+    parentId: string | null,
+    depth: number
+  ): React.ReactNode[] => {
+    return comments
+      .filter((c) => c.parent_comment_id === parentId)
+      .map((c) => (
+        <div
+          key={c.id}
+          className="border-b pb-2"
+          style={{ marginLeft: depth * 16 }}
+        >
+          <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+            <img
+              src={getAvatarSrc(c.author)}
+              className="w-4 h-4 rounded-full"
+              alt="avatar"
+            />
+            {c.author.substring(0, 6)}… •{" "}
+            {new Date(c.created_at).toLocaleString()}
+          </p>
+          <div className="text-sm">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                img: ({ ...props }) => (
+                  <img
+                    {...props}
+                    className="w-24 h-24 object-cover rounded mr-1 mb-1 inline-block"
+                  />
+                ),
+              }}
+            >
+              {c.content}
+            </ReactMarkdown>
+          </div>
+          {/* like & reply */}
+          <div className="flex items-center gap-4 text-sm mt-1">
+            <button
+              onClick={() => toggleCommentLike(c.id)}
+              className="flex items-center gap-1"
+            >
+              <span>{c.liked ? "❤️" : "🤍"}</span>
+              <span>{c.likes}</span>
+            </button>
+            <button
+              onClick={() => handleReply(c)}
+              className="text-[var(--primary)]"
+            >
+              Reply
+            </button>
+          </div>
+          {/* render children */}
+          {renderComments(c.id, depth + 1)}
+        </div>
+      ));
+  };
+
+  if (loading) return <p className="p-4">Loading...</p>;
+  if (!post) return <p className="p-4">Post not found</p>;
+
+  const handleSend = async () => {
+    if (!commentInput.trim() && commentFiles.length === 0) return;
+    const author = user?.wallet?.address ?? "Anonymous";
+
+    // upload images first
+    const mediaUrls: string[] = [];
+    for (const file of commentFiles) {
+      const ext = file.name.split(".").pop();
+      const filePath = `${author}/${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2)}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, file, {
+          upsert: false,
+          contentType: file.type,
+        });
+      if (uploadErr) {
+        alert("Failed to upload image");
+        return;
+      }
+      const { data: urlData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+      mediaUrls.push(urlData.publicUrl);
+    }
+
+    let finalContent = commentInput.trim();
+    for (const url of mediaUrls) {
+      finalContent += `\n\n![image](${url})`;
+    }
+
+    const { error } = await supabase.from("comments").insert({
+      post_id: id,
+      author,
+      content: finalContent,
+      parent_comment_id: replyTo?.id ?? null,
+    });
+    if (!error) {
+      setCommentInput("");
+      setCommentFiles([]);
+      setReplyTo(null);
+      fetchComments();
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <header className="sticky top-0 bg-white shadow px-4 py-2 flex items-center gap-2">
+        <button
+          onClick={() => router.back()}
+          className="text-[var(--primary)] text-lg"
+        >
+          ←
+        </button>
+        <div className="flex items-center gap-2 truncate">
+          <img
+            src={getAvatarSrc(post.author)}
+            className="w-6 h-6 rounded-full"
+            alt="avatar"
+          />
+          <h1 className="font-bold text-[var(--primary)] truncate">
+            {authorDisplayName}
+          </h1>
+        </div>
+      </header>
+      <main className="flex-1 overflow-y-auto">
+        {/* media carousel simple */}
+        {post.media_urls && post.media_urls.length > 0 ? (
+          <div className="w-full bg-white flex overflow-x-auto snap-x snap-mandatory rounded-b-xl">
+            {post.media_urls.map((url: string, idx: number) => (
+              <div
+                key={idx}
+                className="snap-center flex-shrink-0 w-full flex items-center justify-center bg-white aspect-[3/4]"
+              >
+                <img
+                  src={url}
+                  className="max-w-full max-h-full object-contain"
+                  alt="media"
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="w-full flex items-center justify-center bg-gradient-to-br from-[var(--primary)]/10 to-[var(--primary)]/20 aspect-[3/4] rounded-b-xl p-6">
+            <p className="font-hand text-3xl font-bold text-[var(--primary)] leading-snug text-center">
+              {post.summary ?? post.title}
+            </p>
+          </div>
+        )}
+        <div className="px-4 py-2 text-sm text-gray-500">
+          {new Date(post.created_at).toLocaleString()}
+        </div>
+
+        {/* likes / stars / gift */}
+        <div className="px-4 py-2 flex items-center gap-6 text-lg">
+          <button onClick={toggleLike} className="flex items-center gap-1">
+            <span>{liked ? "❤️" : "🤍"}</span>
+            <span className="text-sm">{likesCount}</span>
+          </button>
+          <button onClick={toggleStar} className="flex items-center gap-1">
+            <span>{starred ? "⭐" : "☆"}</span>
+            <span className="text-sm">{starsCount}</span>
+          </button>
+          {!post.is_restricted && <button className="ml-auto">🎁</button>}
+        </div>
+        <div className="prose p-4 max-w-none">
+          <h1 className="text-2xl font-bold mb-4">{post.title}</h1>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {post.content}
+          </ReactMarkdown>
+        </div>
+      </main>
+      <hr className="my-4 border-t" />
+      <section className="px-4 pb-40">
+        {/* space for bottom bar */}
+
+        <h2 className="font-semibold mb-2 text-sm">
+          Comments ({comments.length})
+        </h2>
+        {comments.length === 0 && (
+          <p className="text-sm text-gray-400">No comments yet</p>
+        )}
+
+        {/* recursive comment renderer */}
+        <div className="space-y-3">{renderComments(null, 0)}</div>
+      </section>
+
+      {/* unified bottom composer */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-inner flex flex-col">
+        {/* reply banner */}
+        {replyTo && (
+          <div className="flex justify-between items-center px-4 py-1 text-xs bg-[var(--primary)]/10">
+            <span>Replying to {replyTo.author.substring(0, 6)}…</span>
+            <button
+              onClick={() => setReplyTo(null)}
+              className="text-[var(--primary)] font-semibold"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* attached image previews */}
+        {commentFiles.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto px-4 py-2 border-t">
+            {commentFiles.map((file, idx) => (
+              <img
+                key={idx}
+                src={URL.createObjectURL(file)}
+                className="w-16 h-16 object-cover rounded"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* input bar */}
+        <div className="flex items-center px-4 py-2 gap-2 border-t">
+          <input
+            type="text"
+            placeholder={replyTo ? "Reply…" : "Say something…"}
+            value={commentInput}
+            onChange={(e) => setCommentInput(e.target.value)}
+            className="flex-1 border rounded-full px-3 py-1 text-sm focus:outline-none"
+          />
+          {/* attach image */}
+          <label
+            className="cursor-pointer text-xl"
+            htmlFor="comment-file-input"
+          >
+            📷
+          </label>
+          <input
+            id="comment-file-input"
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+          <button
+            onClick={handleSend}
+            className="bg-[var(--primary)] text-white px-4 py-1 rounded-full disabled:opacity-50"
+            disabled={!commentInput.trim() && commentFiles.length === 0}
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PostDetail;
