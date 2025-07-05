@@ -3,8 +3,10 @@ import { JsonRpcProvider, Contract } from "ethers";
 const CELO_RPC =
   process.env.NEXT_PUBLIC_CELO_RPC ??
   "https://alfajores-forno.celo-testnet.org";
-const CUSTOMIZATION_ADDRESS = process.env
-  .NEXT_PUBLIC_CUSTOMIZATION_CONTRACT as `0x${string}`;
+const CUSTOMIZATION_ADDRESS =
+  (process.env.NEXT_PUBLIC_CUSTOMIZATION_CONTRACT as
+    | `0x${string}`
+    | undefined) ?? "0x1ba052bd126d7c5ee3a4baeaf51e3cc2eebd32d7";
 
 // Minimal ABI for the mapping getters
 const ABI = [
