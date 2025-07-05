@@ -1,5 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
 import { supabase } from "@/lib/supabaseClient";
 import PostCard from "@/components/PostCard";
@@ -9,6 +10,7 @@ import { getAvatarSrc } from "@/utils/avatar";
 import { resolveENS } from "@/utils/ens";
 import { fetchVerification } from "@/utils/verification";
 import { useSenior } from "@/components/SeniorModeProvider";
+import { useNotifications } from "@/utils/notifications";
 
 interface Post {
   id: string;
@@ -129,10 +131,23 @@ const ProfilePage: React.FC = () => {
 
   const { isSenior } = useSenior();
 
+  // notifications
+  const { notifications } = useNotifications();
+  const unread = notifications.length;
+
   return (
     <div className="flex flex-col min-h-screen bg-[var(--muted-bg)]">
       {/* Header */}
-      <header className="bg-white shadow p-6 flex flex-col items-center gap-2">
+      <header className="bg-white shadow p-6 flex flex-col items-center gap-2 relative">
+        {/* notification bell */}
+        <Link href="/notifications" className="absolute top-2 right-2 text-3xl">
+          🔔
+          {unread > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full text-[10px] w-4 h-4 flex items-center justify-center">
+              {unread}
+            </span>
+          )}
+        </Link>
         <img
           src={avatarSrc}
           alt="avatar"
@@ -171,7 +186,9 @@ const ProfilePage: React.FC = () => {
           <p className="text-center text-sm text-gray-500">Loading...</p>
         )}
         {!loading && tab === "posts" && (
-          <div className={`grid ${isSenior ? "grid-cols-1" : "grid-cols-2"} gap-2`}>
+          <div
+            className={`grid ${isSenior ? "grid-cols-1" : "grid-cols-2"} gap-2`}
+          >
             {posts.map((p) => (
               <PostCard key={p.id} post={p} />
             ))}
@@ -181,7 +198,9 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
         {!loading && tab === "likes" && (
-          <div className={`grid ${isSenior ? "grid-cols-1" : "grid-cols-2"} gap-2`}>
+          <div
+            className={`grid ${isSenior ? "grid-cols-1" : "grid-cols-2"} gap-2`}
+          >
             {likedPosts.map((p) => (
               <PostCard key={p.id} post={p} />
             ))}
@@ -193,7 +212,9 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
         {!loading && tab === "stars" && (
-          <div className={`grid ${isSenior ? "grid-cols-1" : "grid-cols-2"} gap-2`}>
+          <div
+            className={`grid ${isSenior ? "grid-cols-1" : "grid-cols-2"} gap-2`}
+          >
             {starredPosts.map((p) => (
               <PostCard key={p.id} post={p} />
             ))}
