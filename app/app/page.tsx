@@ -5,6 +5,8 @@ import React, { useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { ethers } from "ethers";
+import Image from "next/image";
+import AnimatedAvatars from "@/components/AnimatedAvatars";
 // Address of the deployed Customization contract on Flow Mainnet EVM
 const CONTRACT_ADDRESS = "0x1bA052BD126d7C5EE3A4baEAF51e3cc2eeBd32D7";
 // Minimal ABI to read nationality mapping
@@ -76,8 +78,9 @@ const Page = () => {
   // Only render once the Privy provider is ready
   if (!ready) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 p-4 text-center">
-        <h1 className="text-4xl font-bold text-white animate-pulse">
+      <main className="relative min-h-screen flex items-center justify-center bg-white p-4 text-center">
+        <AnimatedAvatars />
+        <h1 className="relative z-10 text-3xl md:text-4xl font-hand font-bold text-gray-700 animate-pulse">
           Loading...
         </h1>
       </main>
@@ -93,16 +96,28 @@ const Page = () => {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center animated-gradient p-4 text-center">
-      <div className="bg-white/70 backdrop-blur-sm px-12 py-16 rounded-xl shadow-2xl flex flex-col items-center gap-10 fade-in-up">
-        <h1 className="text-5xl md:text-7xl font-extrabold text-[var(--primary)] tracking-tight drop-shadow-md select-none">
-          PostHub
-        </h1>
+    <main className="relative min-h-screen flex items-center justify-center bg-white p-4 text-center">
+      {/* Decorative floating avatars */}
+      <AnimatedAvatars />
+      <div className="relative z-10 bg-white px-12 py-16 rounded-xl shadow-2xl flex flex-col items-center gap-10 fade-in-up">
+        {/* App logo */}
+        <Image
+          src="/logo.png"
+          alt="PostHub Logo"
+          width={160}
+          height={160}
+          priority
+          className="w-40 h-40 md:w-52 md:h-52 object-contain drop-shadow-lg select-none"
+        />
+        {/* Tagline */}
+        <p className="text-2xl md:text-3xl font-hand font-bold text-gray-700">
+          Your decentralized hub for sharing moments
+        </p>
         <button
           onClick={handleClick}
-          className="rounded-full bg-[var(--primary)] hover:bg-red-600 active:scale-95 text-white transition-transform transform-gpu duration-200 font-semibold px-10 py-4 shadow-xl hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-red-300"
+          className="rounded-full bg-[var(--primary)] hover:bg-red-600 active:scale-95 text-white transition-transform transform-gpu duration-200 font-semibold px-12 py-4 shadow-xl hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-red-300"
         >
-          {authenticated ? "Disconnect" : "Connect"}
+          {authenticated ? "Disconnect" : "Get Started"}
         </button>
       </div>
     </main>
