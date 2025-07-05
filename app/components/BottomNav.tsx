@@ -13,7 +13,7 @@ const BottomNav = () => {
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6 mb-0.5"
+          className="h-7 w-7 mb-0.5"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -35,7 +35,7 @@ const BottomNav = () => {
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6 mb-0.5"
+          className="h-7 w-7 mb-0.5"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -44,7 +44,7 @@ const BottomNav = () => {
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M12 3v2m0 14v2m9-9h-2M5 12H3m14.95-6.95l-1.414 1.414M6.464 17.536l-1.414 1.414m0-13.95l1.414 1.414M17.536 17.536l1.414 1.414"
+            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.96a1 1 0 00.95.69h4.17c.969 0 1.371 1.24.588 1.81l-3.368 2.448a1 1 0 00-.364 1.118l1.286 3.959c.3.921-.755 1.688-1.54 1.118l-3.368-2.448a1 1 0 00-1.175 0l-3.368 2.448c-.785.57-1.84-.197-1.54-1.118l1.286-3.959a1 1 0 00-.364-1.118L2.05 9.387c-.783-.57-.38-1.81.588-1.81h4.17a1 1 0 00.95-.69l1.286-3.96z"
           />
         </svg>
         Rewards
@@ -52,10 +52,23 @@ const BottomNav = () => {
 
       {/* Add */}
       <button
-        className="-mt-8 bg-[var(--primary)] w-14 h-14 rounded-full text-white flex items-center justify-center text-3xl shadow-lg border-4 border-white"
+        className="-mt-8 bg-[var(--primary)] w-14 h-14 rounded-full text-white flex items-center justify-center shadow-lg border-4 border-white"
         onClick={() => router.push("/create")}
       >
-        +
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth="2"
+          stroke="currentColor"
+          className="h-8 w-8"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 4.5v15m7.5-7.5h-15"
+          />
+        </svg>
       </button>
 
       {/* Notifications */}
@@ -65,7 +78,7 @@ const BottomNav = () => {
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6 mb-0.5"
+          className="h-7 w-7 mb-0.5"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -74,7 +87,12 @@ const BottomNav = () => {
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.64 5.36 6 7.92 6 11v3.159c0 .538-.214 1.054-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+            d="M14 10V6a2 2 0 10-4 0v4c0 3.866-2.239 6.572-3 7h10c-.761-.428-3-3.134-3-7z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M13.73 21a2.001 2.001 0 01-3.46 0"
           />
         </svg>
         Notify
@@ -87,7 +105,7 @@ const BottomNav = () => {
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6 mb-0.5"
+          className="h-7 w-7 mb-0.5"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
