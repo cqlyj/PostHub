@@ -101,6 +101,9 @@ const CreatePostPage = () => {
         console.warn("Failed to fetch user type", tagErr);
       }
 
+      // declare variable to hold inserted row id for later updates
+      let insertedId: string | null = null;
+
       // upload media
       const mediaUrls: string[] = [];
       for (const file of files) {
@@ -121,8 +124,9 @@ const CreatePostPage = () => {
         mediaUrls.push(urlData.publicUrl);
       }
 
-      // insert post
-      const { error: insertErr } = await supabase.from("posts").insert({
+      // 2. Insert post off-chain immediately
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const postRow: Record<string, any> = {
         author: user.wallet.address,
         title,
         summary,
@@ -131,10 +135,48 @@ const CreatePostPage = () => {
         gender,
         age_group: ageGroup,
         is_restricted: isRestricted,
-      });
+        tx_hash: null, // will be filled in background
+      };
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from("posts")
+        .insert(postRow)
+        .select("id")
+        .single();
+
       if (insertErr) throw insertErr;
 
-      router.push("/explore");
+      insertedId = inserted.id;
+
+      // 3. Now fire on-chain tx in background
+      let txHash: string | null = null;
+      fetch("/api/createOnchain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          author: user.wallet.address,
+          title,
+          summary,
+          mediaLinks: mediaUrls,
+        }),
+      })
+        .then(async (r) => {
+          if (r.ok) {
+            const data = await r.json();
+            txHash = data.hash as string;
+            // best-effort: patch the post row with tx_hash after insert
+            await supabase
+              .from("posts")
+              .update({ tx_hash: txHash })
+              .eq("id", insertedId!);
+          } else {
+            console.error("Failed to create post on-chain", await r.text());
+          }
+        })
+        .catch((ocErr) => console.error("On-chain request error", ocErr));
+
+      // 4. Jump to the new post detail page instantly
+      router.push(`/post/${insertedId}`);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Failed to create post";
