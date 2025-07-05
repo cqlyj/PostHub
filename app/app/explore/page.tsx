@@ -3,36 +3,36 @@
 
 import React, { useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { ethers } from "ethers";
 import { useRouter } from "next/navigation";
 
-// Customization contract on Flow Mainnet EVM
-const CONTRACT_ADDRESS = "0x1bA052BD126d7C5EE3A4baEAF51e3cc2eeBd32D7";
-// Celo Alfajores testnet RPC
-const CELO_TESTNET_RPC = "https://alfajores-forno.celo-testnet.org";
+import TopSearchBar from "@/components/TopSearchBar";
+import BottomNav from "@/components/BottomNav";
+import { supabase } from "@/lib/supabaseClient";
+import PostCard from "@/components/PostCard";
 
-// Minimal ABI to read user type mapping in Customization contract
-const ABI = ["function s_userType(address) view returns (uint8)"]; // mapping(address => uint8)
-
-const USER_TYPE_LABELS = [
-  "RESTRICTED_MINOR_MALE",
-  "RESTRICTED_MINOR_FEMALE",
-  "RESTRICTED_ADULT_MALE",
-  "RESTRICTED_ADULT_FEMALE",
-  "RESTRICTED_SENIOR_MALE",
-  "RESTRICTED_SENIOR_FEMALE",
-  "MINOR_MALE",
-  "MINOR_FEMALE",
-  "ADULT_MALE",
-  "ADULT_FEMALE",
-  "SENIOR_MALE",
-  "SENIOR_FEMALE",
-];
+// On-chain constants not needed for UI-only explore page
 
 const ExplorePage = () => {
   const { user, logout, authenticated } = usePrivy();
-  const [userType, setUserType] = useState<string | null>(null);
+  // const [userType, setUserType] = useState<string | null>(null);
   const router = useRouter();
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchPosts = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("posts")
+      .select("id,title,summary,media_urls,author")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (!error && data) setPosts(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
 
   useEffect(() => {
     // Detect wallet disconnection and force logout
@@ -64,42 +64,25 @@ const ExplorePage = () => {
     }
   }, [user, router]);
 
-  useEffect(() => {
-    const fetchUserType = async () => {
-      if (!user?.wallet?.address || !window.ethereum) return;
-      try {
-        // Always read from the Celo testnet
-        const provider = new ethers.JsonRpcProvider(CELO_TESTNET_RPC);
-        // Fetch user type directly via contract call
-        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
-        const indexNum = Number(await contract.s_userType(user.wallet.address));
-        const label = USER_TYPE_LABELS[indexNum] ?? `Unknown (${indexNum})`;
-        setUserType(label);
-      } catch (err) {
-        console.error("Failed to fetch user type", err);
-      }
-    };
-
-    fetchUserType();
-  }, [user]);
+  /* userType fetching removed from explore UI to avoid unused var */
 
   return (
-    <main className="min-h-screen flex items-center justify-center animated-gradient p-4 text-center">
-      <div className="bg-white/80 backdrop-blur-md px-10 py-14 rounded-xl shadow-2xl flex flex-col items-center gap-6 fade-in-up w-full max-w-lg">
-        <h1 className="text-4xl font-bold text-blue-800">
-          Welcome to PostHub Exploration
-        </h1>
-        {userType ? (
-          <p className="text-2xl text-blue-700">
-            Your user type: <span className="font-semibold">{userType}</span>
-          </p>
-        ) : (
-          <p className="text-blue-700 animate-pulse">
-            Fetching your user type...
-          </p>
+    <div className="flex flex-col min-h-screen bg-[var(--muted-bg)]">
+      <TopSearchBar />
+
+      <main className="flex-1 overflow-y-auto p-2">
+        {loading && (
+          <p className="text-center text-sm text-gray-500 mb-2">Loading...</p>
         )}
-      </div>
-    </main>
+        <div className="grid grid-cols-2 gap-2">
+          {posts.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+        </div>
+      </main>
+
+      <BottomNav />
+    </div>
   );
 };
 
