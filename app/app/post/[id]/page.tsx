@@ -11,7 +11,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { usePrivy } from "@privy-io/react-auth";
 import { getAvatarSrc } from "@/utils/avatar";
-import { resolveENS } from "@/utils/ens";
+import { getDisplayName } from "@/utils/displayName";
 import { ethers } from "ethers";
 import GiftModal from "@/components/GiftModal";
 import GiftAnimationOverlay, {
@@ -57,6 +57,7 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
     parent_comment_id: string | null;
     likes: number;
     liked: boolean;
+    displayName: string;
   };
 
   const [comments, setComments] = useState<Comment[]>([]);
@@ -110,10 +111,12 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
             .maybeSingle();
           userLiked = !!likeRow;
         }
+        const displayName = await getDisplayName(c.author);
         return {
           ...c,
           likes: likeCnt ?? 0,
           liked: userLiked,
+          displayName,
         } as Comment;
       })
     );
@@ -129,11 +132,7 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
         .single();
       if (!error) {
         setPost(data);
-        resolveENS(data.author).then((name) => {
-          setAuthorDisplayName(
-            name ?? `${data.author.substring(0, 6)}…${data.author.slice(-4)}`
-          );
-        });
+        getDisplayName(data.author).then((name) => setAuthorDisplayName(name));
       }
       await fetchComments();
       setLoading(false);
@@ -418,8 +417,7 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
               className="w-4 h-4 rounded-full"
               alt="avatar"
             />
-            {c.author.substring(0, 6)}… •{" "}
-            {new Date(c.created_at).toLocaleString()}
+            {c.displayName} • {new Date(c.created_at).toLocaleString()}
           </p>
           <div className="text-sm">
             <ReactMarkdown
@@ -663,7 +661,7 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
         {/* reply banner */}
         {replyTo && (
           <div className="flex justify-between items-center px-4 py-1 text-xs bg-[var(--primary)]/10">
-            <span>Replying to {replyTo.author.substring(0, 6)}…</span>
+            <span>Replying to {replyTo.displayName}</span>
             <button
               onClick={() => setReplyTo(null)}
               className="text-[var(--primary)] font-semibold"
