@@ -2,10 +2,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useEffect, useState } from "react";
+// simple debounce via setTimeout inside useEffect
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 
 import TopSearchBar from "@/components/TopSearchBar";
+import {
+  computeSearchRank,
+  PostWithCounts,
+  userTypeToAgeGroup,
+  UserInfo,
+} from "@/utils/searchRanking";
+import { fetchVerification } from "@/utils/verification";
 import BottomNav from "@/components/BottomNav";
 import { supabase } from "@/lib/supabaseClient";
 import PostCard from "@/components/PostCard";
@@ -16,23 +24,95 @@ const ExplorePage = () => {
   const { user, logout, authenticated } = usePrivy();
   // const [userType, setUserType] = useState<string | null>(null);
   const router = useRouter();
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<PostWithCounts[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const fetchPosts = async () => {
+  const [userInfo, setUserInfo] = useState<UserInfo>({
+    nationality: "",
+    ageGroup: "adult",
+  });
+
+  // Fetch user verification info once
+  useEffect(() => {
+    const loadVerification = async () => {
+      if (user?.wallet?.address) {
+        const info = await fetchVerification(user.wallet.address);
+        setUserInfo({
+          nationality: info.nationality,
+          ageGroup: userTypeToAgeGroup(info.userType),
+        });
+      }
+    };
+    loadVerification();
+  }, [user]);
+
+  const fetchPosts = async (keyword: string) => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from("posts")
-      .select("id,title,summary,media_urls,author")
-      .order("created_at", { ascending: false })
+      .select("id,title,summary,media_urls,author,age_group")
       .limit(50);
-    if (!error && data) setPosts(data);
+
+    if (keyword.trim() !== "") {
+      // simple ILIKE search on title + summary
+      const escaped = keyword.replace(/[%_]/g, "\\$&");
+      query = query.or(`title.ilike.%${escaped}%,summary.ilike.%${escaped}%`);
+    } else {
+      // default order: latest
+      query = query.order("created_at", { ascending: false });
+    }
+
+    const { data, error } = await query;
+
+    if (!error && data) {
+      // enrich with likes / stars counts
+      const enriched = await Promise.all(
+        data.map(async (p) => {
+          const likeRes = await supabase
+            .from("likes")
+            .select("id", { head: true, count: "exact" })
+            .eq("post_id", p.id);
+
+          const { count: starCnt } = await supabase
+            .from("stars")
+            .select("id", { head: true, count: "exact" })
+            .eq("post_id", p.id);
+
+          return {
+            ...p,
+            likesCount: likeRes.count ?? 0,
+            starsCount: starCnt ?? 0,
+          } as PostWithCounts;
+        })
+      );
+
+      // ranking
+      const keywordsArr = keyword.toLowerCase().split(/\s+/).filter(Boolean);
+      enriched.sort(
+        (a, b) =>
+          computeSearchRank(b, keywordsArr, userInfo) -
+          computeSearchRank(a, keywordsArr, userInfo)
+      );
+
+      setPosts(enriched);
+    }
     setLoading(false);
   };
 
+  // initial fetch
   useEffect(() => {
-    fetchPosts();
+    fetchPosts("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // fetch when search term changes (debounced)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchPosts(searchTerm);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   useEffect(() => {
     // Detect wallet disconnection and force logout
@@ -68,7 +148,7 @@ const ExplorePage = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-[var(--muted-bg)]">
-      <TopSearchBar />
+      <TopSearchBar searchTerm={searchTerm} onSearchChange={setSearchTerm} />
 
       <main className="flex-1 overflow-y-auto p-2">
         {loading && (
