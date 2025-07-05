@@ -66,7 +66,10 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               className="w-4 h-4 rounded-full"
               alt="avatar"
             />
-            <span className="text-[var(--primary)] truncate max-w-[6rem]">
+            <span
+              className="text-[var(--primary)] truncate max-w-[9rem]"
+              title={displayName}
+            >
               {displayName || "Anon"}
             </span>
           </span>
