@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {PostRegistry} from "../src/PostRegistry.sol";
+import {MockUsdc} from "../src/MockUsdc.sol";
 
 contract DeployFlow is Script {
     function run() external {
@@ -10,6 +11,9 @@ contract DeployFlow is Script {
 
         PostRegistry postRegistry = new PostRegistry();
         console.log("PostRegistry deployed at:", address(postRegistry));
+
+        MockUsdc mockUsdc = new MockUsdc();
+        console.log("MockUsdc deployed at:", address(mockUsdc));
 
         vm.stopBroadcast();
     }
