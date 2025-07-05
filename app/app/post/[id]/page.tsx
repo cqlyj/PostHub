@@ -18,6 +18,7 @@ import GiftAnimationOverlay, {
   GiftOption as GiftOptionType,
 } from "@/components/GiftAnimationOverlay";
 import { isVideoUrl, extractSamsungMotionPhoto } from "@/utils/media";
+import { sendNotification } from "@/utils/notifications";
 
 type GiftOption = GiftOptionType;
 
@@ -33,6 +34,7 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
   const { id } = reactUse(params);
   const router = useRouter();
   const { user } = usePrivy();
+
   interface Post {
     id: string;
     author: string;
@@ -224,6 +226,7 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
       });
       setLiked(true);
       setLikesCount((c) => c + 1);
+      if (post?.author) sendNotification(post.author, "like");
     }
   };
 
@@ -244,6 +247,7 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
       });
       setStarred(true);
       setStarsCount((c) => c + 1);
+      if (post?.author) sendNotification(post.author, "star");
     }
   };
 
@@ -295,6 +299,8 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
 
       // open animation overlay
       setAnimData({ option, txHash: tx.hash, visible: true, confirmed: false });
+      // Notify recipient immediately
+      sendNotification(recipient, "gift_received");
 
       // wait for confirmation in background
       provider
@@ -312,6 +318,8 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
           });
         })
         .catch((err) => console.error("Wait tx error", err));
+
+      // No local notification; recipient will be notified through realtime update
     } catch (err) {
       console.error("Gift send failed", err);
       alert("Failed to send gift: " + (err as Error).message);
@@ -480,6 +488,12 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
       setCommentFiles([]);
       setReplyTo(null);
       fetchComments();
+      // Notify appropriate recipient
+      if (replyTo) {
+        sendNotification(replyTo.author, "reply");
+      } else if (post?.author) {
+        sendNotification(post.author, "comment");
+      }
     }
   };
 
