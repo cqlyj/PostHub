@@ -5,6 +5,7 @@ import { SelfQRcodeWrapper, SelfAppBuilder } from "@selfxyz/qrcode";
 import AnimatedAvatars from "@/components/AnimatedAvatars";
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
+import { getUniversalLink } from "@selfxyz/common/utils/appType";
 
 const CustomizePage = () => {
   const { user } = usePrivy();
@@ -41,6 +42,11 @@ const CustomizePage = () => {
     }).build();
   }, [user]);
 
+  const deeplink = useMemo(() => {
+    if (!selfApp) return null;
+    return getUniversalLink(selfApp);
+  }, [selfApp]);
+
   if (!selfApp) {
     return (
       <main className="relative min-h-screen flex items-center justify-center bg-white p-4 text-center">
@@ -70,6 +76,14 @@ const CustomizePage = () => {
               onSuccess={() => setCompleted(true)}
               onError={() => setCompleted(true)}
             />
+            {deeplink && (
+              <a
+                href={deeplink}
+                className="mt-4 text-[var(--primary)] underline hover:opacity-80"
+              >
+                Open in Self app
+              </a>
+            )}
             <button
               onClick={() => setCompleted(true)}
               className="mt-4 text-[var(--primary)] underline hover:opacity-80"
