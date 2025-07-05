@@ -1,103 +1,112 @@
-import Image from "next/image";
+"use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+import React, { useEffect } from "react";
+import { usePrivy } from "@privy-io/react-auth";
+import { useRouter } from "next/navigation";
+import { ethers } from "ethers";
+// Address of the deployed Customization contract on Flow Mainnet EVM
+const CONTRACT_ADDRESS = "0x1bA052BD126d7C5EE3A4baEAF51e3cc2eeBd32D7";
+// Minimal ABI to read nationality mapping
+const NAT_ABI = ["function s_userNationality(address) view returns (string)"];
+// Celo Alfajores (testnet) RPC for on-chain reads
+const CELO_TESTNET_RPC = "https://alfajores-forno.celo-testnet.org";
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+const Page = () => {
+  const { ready, authenticated, login, logout, user } = usePrivy();
+  const router = useRouter();
+
+  // Detect wallet disconnection at the provider level and force logout
+  useEffect(() => {
+    if (typeof window === "undefined" || !(window as any).ethereum) return;
+    const ethereum = (window as any).ethereum;
+
+    const handleAccountsChanged = (accounts: string[]) => {
+      if (accounts.length === 0 && authenticated) {
+        logout();
+      }
+    };
+
+    const handleDisconnect = () => {
+      if (authenticated) logout();
+    };
+
+    ethereum.on("accountsChanged", handleAccountsChanged);
+    ethereum.on("disconnect", handleDisconnect);
+
+    return () => {
+      ethereum.removeListener("accountsChanged", handleAccountsChanged);
+      ethereum.removeListener("disconnect", handleDisconnect);
+    };
+  }, [authenticated, logout]);
+
+  // After connection, determine whether the user has already customized
+  useEffect(() => {
+    const decideRedirect = async () => {
+      if (!ready || !authenticated || !user?.wallet?.address) return;
+
+      try {
+        // Always read from the Celo testnet
+        const provider = new ethers.JsonRpcProvider(CELO_TESTNET_RPC);
+
+        // Read nationality directly from the contract using a lightweight ABI
+        const contract = new ethers.Contract(
+          CONTRACT_ADDRESS,
+          NAT_ABI,
+          provider
+        );
+        const nationality: string = await contract.s_userNationality(
+          user.wallet.address
+        );
+
+        if (nationality && nationality.trim() !== "") {
+          router.push("/explore");
+        } else {
+          router.push("/customize");
+        }
+      } catch (err) {
+        console.error("Error fetching nationality:", err);
+        router.push("/customize");
+      }
+    };
+
+    decideRedirect();
+  }, [ready, authenticated, user, router]);
+
+  // Only render once the Privy provider is ready
+  if (!ready) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 p-4 text-center">
+        <h1 className="text-4xl font-bold text-white animate-pulse">
+          Loading...
+        </h1>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+    );
+  }
+
+  const handleClick = () => {
+    if (authenticated) {
+      logout();
+    } else {
+      login();
+    }
+  };
+
+  return (
+    <main className="min-h-screen flex items-center justify-center animated-gradient p-4 text-center">
+      <div className="bg-white/70 backdrop-blur-sm px-12 py-16 rounded-xl shadow-2xl flex flex-col items-center gap-10 fade-in-up">
+        <h1 className="text-5xl md:text-7xl font-extrabold text-blue-800 tracking-tight drop-shadow-md select-none">
+          PostHub
+        </h1>
+        <button
+          onClick={handleClick}
+          className="rounded-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:via-purple-700 hover:to-pink-700 active:scale-95 text-white transition-transform transform-gpu duration-200 font-semibold px-10 py-4 shadow-xl hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-purple-400"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          {authenticated ? "Disconnect" : "Connect"}
+        </button>
+      </div>
+    </main>
   );
-}
+};
+
+export default Page;
