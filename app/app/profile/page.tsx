@@ -133,7 +133,7 @@ const ProfilePage: React.FC = () => {
 
   // notifications
   const { notifications } = useNotifications();
-  const unread = notifications.length;
+  const unread = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="flex flex-col min-h-screen bg-[var(--muted-bg)]">
