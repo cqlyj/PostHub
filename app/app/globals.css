@@ -72,3 +72,36 @@ body {
 .font-hand {
   font-family: "Patrick Hand", cursive;
 }
+
+/* Custom floating animation for landing page avatars */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-24px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.float-animation {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes floatTilt {
+  0% {
+    transform: translateY(0px) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-24px) rotate(3deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(-3deg);
+  }
+}
+
+.float-tilt {
+  animation: floatTilt 8s ease-in-out infinite;
+}
