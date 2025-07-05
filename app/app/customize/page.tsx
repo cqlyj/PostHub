@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import { SelfQRcodeWrapper, SelfAppBuilder } from "@selfxyz/qrcode";
+import AnimatedAvatars from "@/components/AnimatedAvatars";
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 
@@ -28,6 +29,8 @@ const CustomizePage = () => {
       userId: address, // Use wallet address for on-chain verification
       userIdType: "hex", // use 'hex' for ethereum address or 'uuid' for uuidv4
       version: 2, // V2 configuration
+      logoBase64:
+        "https://tnxlazzhdahkkfmoqboa.supabase.co/storage/v1/object/public/post-media//logo.png",
       disclosures: {
         date_of_birth: true,
         nationality: true,
@@ -40,8 +43,9 @@ const CustomizePage = () => {
 
   if (!selfApp) {
     return (
-      <main className="min-h-screen flex items-center justify-center animated-gradient p-4 text-center">
-        <h1 className="text-2xl font-semibold text-[var(--primary)] animate-pulse">
+      <main className="relative min-h-screen flex items-center justify-center bg-white p-4 text-center">
+        <AnimatedAvatars />
+        <h1 className="relative z-10 text-2xl md:text-3xl font-hand font-bold text-gray-700 animate-pulse">
           Loading verification...
         </h1>
       </main>
@@ -49,8 +53,9 @@ const CustomizePage = () => {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center animated-gradient p-4 text-center">
-      <div className="bg-white/80 backdrop-blur-md px-8 py-12 rounded-xl shadow-2xl flex flex-col items-center gap-6 fade-in-up w-full max-w-md">
+    <main className="relative min-h-screen flex items-center justify-center bg-white p-4 text-center">
+      <AnimatedAvatars />
+      <div className="relative z-10 bg-white px-8 py-12 rounded-xl shadow-2xl flex flex-col items-center gap-6 fade-in-up w-full max-w-md">
         <h2 className="text-3xl font-bold text-[var(--primary)]">
           Customize Your Experience
         </h2>
