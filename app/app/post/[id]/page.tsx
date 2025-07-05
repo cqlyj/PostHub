@@ -226,7 +226,13 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
       });
       setLiked(true);
       setLikesCount((c) => c + 1);
-      if (post?.author) sendNotification(post.author, "like");
+      if (post?.author && user?.wallet?.address)
+        sendNotification({
+          recipient: post.author,
+          actor: user.wallet.address,
+          postId: id,
+          type: "like",
+        });
     }
   };
 
@@ -247,7 +253,13 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
       });
       setStarred(true);
       setStarsCount((c) => c + 1);
-      if (post?.author) sendNotification(post.author, "star");
+      if (post?.author && user?.wallet?.address)
+        sendNotification({
+          recipient: post.author,
+          actor: user.wallet.address,
+          postId: id,
+          type: "star",
+        });
     }
   };
 
@@ -299,8 +311,13 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
 
       // open animation overlay
       setAnimData({ option, txHash: tx.hash, visible: true, confirmed: false });
-      // Notify recipient immediately
-      sendNotification(recipient, "gift_received");
+      if (user?.wallet?.address)
+        sendNotification({
+          recipient,
+          actor: user.wallet.address,
+          postId: id,
+          type: "gift_received",
+        });
 
       // wait for confirmation in background
       provider
@@ -348,12 +365,23 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
           comment_id: commentId,
           user_address: address,
         });
+        // Notify comment author
+        const targetAuthor = target.author;
+        if (user?.wallet?.address && targetAuthor !== user.wallet.address) {
+          sendNotification({
+            recipient: targetAuthor,
+            actor: user.wallet.address,
+            postId: id,
+            commentId,
+            type: "comment_like",
+          });
+        }
       }
 
       // Refresh the list so counts persist correctly across reloads
       fetchComments();
     },
-    [user, comments]
+    [user, comments, id]
   );
 
   const handleReply = useCallback((comment: Comment) => {
@@ -380,6 +408,7 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
       .map((c) => (
         <div
           key={c.id}
+          id={`comment-${c.id}`}
           className="border-b pb-2"
           style={{ marginLeft: depth * 16 }}
         >
@@ -477,22 +506,39 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
       finalContent += `\n\n![image](${url})`;
     }
 
-    const { error } = await supabase.from("comments").insert({
-      post_id: id,
-      author,
-      content: finalContent,
-      parent_comment_id: replyTo?.id ?? null,
-    });
-    if (!error) {
+    const { data: inserted, error } = await supabase
+      .from("comments")
+      .insert({
+        post_id: id,
+        author,
+        content: finalContent,
+        parent_comment_id: replyTo?.id ?? null,
+      })
+      .select("id")
+      .single();
+    if (!error && inserted) {
       setCommentInput("");
       setCommentFiles([]);
       setReplyTo(null);
       fetchComments();
       // Notify appropriate recipient
-      if (replyTo) {
-        sendNotification(replyTo.author, "reply");
-      } else if (post?.author) {
-        sendNotification(post.author, "comment");
+      if (user?.wallet?.address) {
+        if (replyTo) {
+          sendNotification({
+            recipient: replyTo.author,
+            actor: user.wallet.address,
+            postId: id,
+            type: "reply",
+            commentId: inserted.id,
+          });
+        } else if (post?.author) {
+          sendNotification({
+            recipient: post.author,
+            actor: user.wallet.address,
+            postId: id,
+            type: "comment",
+          });
+        }
       }
     }
   };
