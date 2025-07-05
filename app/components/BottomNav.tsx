@@ -28,9 +28,9 @@ const BottomNav = () => {
         Home
       </button>
 
-      {/* Wheel */}
+      {/* Rewards */}
       <button
-        onClick={() => router.push("/lucky")}
+        onClick={() => router.push("/rewards")}
         className="flex flex-col items-center text-gray-500 hover:text-[var(--primary)] text-xs"
       >
         <svg
@@ -47,7 +47,7 @@ const BottomNav = () => {
             d="M12 3v2m0 14v2m9-9h-2M5 12H3m14.95-6.95l-1.414 1.414M6.464 17.536l-1.414 1.414m0-13.95l1.414 1.414M17.536 17.536l1.414 1.414"
           />
         </svg>
-        Lucky
+        Rewards
       </button>
 
       {/* Add */}
