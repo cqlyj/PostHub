@@ -12,6 +12,7 @@ import remarkGfm from "remark-gfm";
 import { usePrivy } from "@privy-io/react-auth";
 import { getAvatarSrc } from "@/utils/avatar";
 import { resolveENS } from "@/utils/ens";
+import { ethers } from "ethers";
 
 const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
   // unwrap params promise (Next.js 14)
@@ -27,6 +28,7 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
     media_urls: string[];
     is_restricted: boolean;
     summary?: string;
+    tx_hash?: string | null;
   }
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,9 +53,13 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
   const [starsCount, setStarsCount] = useState(0);
   const [liked, setLiked] = useState(false);
   const [starred, setStarred] = useState(false);
+  const [txConfirmed, setTxConfirmed] = useState<boolean | null>(null);
 
   const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET ?? "post-media";
   const COMMENT_MAX_MEDIA = 3;
+  const FLOW_RPC =
+    process.env.NEXT_PUBLIC_FLOW_EVM_RPC_URL ||
+    "https://mainnet.evm.nodes.onflow.org";
 
   const fetchComments = async () => {
     const { data: commentRows } = await supabase
@@ -111,6 +117,38 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
     };
     fetch();
   }, [id, user?.wallet?.address]);
+
+  // Monitor transaction confirmation
+  useEffect(() => {
+    if (!post?.tx_hash) return;
+
+    const provider = new ethers.JsonRpcProvider(FLOW_RPC);
+
+    let cancelled = false;
+
+    const check = async () => {
+      try {
+        const receipt = await provider.getTransactionReceipt(post.tx_hash!);
+        if (receipt && receipt.blockNumber) {
+          if (!cancelled) setTxConfirmed(true);
+        } else {
+          if (!cancelled) setTxConfirmed(false);
+          setTimeout(check, 8000);
+        }
+      } catch (err) {
+        console.error("Receipt error", err);
+        if (!cancelled) setTimeout(check, 8000);
+      }
+    };
+
+    // initial check
+    check();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.tx_hash]);
 
   // fetch likes / stars counts & user states
   useEffect(() => {
@@ -384,8 +422,26 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
             </p>
           </div>
         )}
-        <div className="px-4 py-2 text-sm text-gray-500">
-          {new Date(post.created_at).toLocaleString()}
+        <div className="px-4 py-2 text-sm text-gray-500 space-y-1">
+          <div>{new Date(post.created_at).toLocaleString()}</div>
+          {post.tx_hash && (
+            <div>
+              {txConfirmed === false && (
+                <span className="mr-2 text-yellow-600">Pending…</span>
+              )}
+              {txConfirmed && (
+                <span className="mr-2 text-green-600">Confirmed</span>
+              )}
+              <a
+                href={`https://evm.flowscan.io/tx/${post.tx_hash}`}
+                target="_blank"
+                rel="noreferrer"
+                className="underline text-[var(--primary)]"
+              >
+                {post.tx_hash.substring(0, 10)}…
+              </a>
+            </div>
+          )}
         </div>
 
         {/* likes / stars / gift */}
