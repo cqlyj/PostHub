@@ -9,6 +9,7 @@ import BottomNav from "@/components/BottomNav";
 import { ethers } from "ethers";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { extractSamsungMotionPhoto } from "@/utils/media";
 // On-chain constants to fetch user type for tags
 const CONTRACT_ADDRESS = "0x1bA052BD126d7C5EE3A4baEAF51e3cc2eeBd32D7";
 const CELO_TESTNET_RPC = "https://alfajores-forno.celo-testnet.org";
@@ -107,21 +108,39 @@ const CreatePostPage = () => {
       // upload media
       const mediaUrls: string[] = [];
       for (const file of files) {
-        const ext = file.name.split(".").pop();
-        const filePath = `${user.wallet.address}/${Date.now()}-${Math.random()
-          .toString(36)
-          .substring(2)}.${ext}`;
-        const { error: uploadErr } = await supabase.storage
-          .from(bucket)
-          .upload(filePath, file, {
-            upsert: false,
-            contentType: file.type,
-          });
-        if (uploadErr) throw uploadErr;
-        const { data: urlData } = supabase.storage
-          .from(bucket)
-          .getPublicUrl(filePath);
-        mediaUrls.push(urlData.publicUrl);
+        // Check if the jpeg contains an embedded motion-photo video
+        const extraBlobs: { blob: Blob | File; ext: string; type: string }[] =
+          [];
+        if (file.type === "image/jpeg") {
+          const videoBlob = await extractSamsungMotionPhoto(file);
+          if (videoBlob) {
+            extraBlobs.push({ blob: videoBlob, ext: "mp4", type: "video/mp4" });
+          }
+        }
+
+        // The image / original file is pushed last so video shows first in carousel
+        extraBlobs.push({
+          blob: file,
+          ext: file.name.split(".").pop() || "",
+          type: file.type,
+        });
+
+        for (const { blob, ext, type } of extraBlobs) {
+          const filePath = `${user.wallet.address}/${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2)}.${ext}`;
+          const { error: uploadErr } = await supabase.storage
+            .from(bucket)
+            .upload(filePath, blob, {
+              upsert: false,
+              contentType: type,
+            });
+          if (uploadErr) throw uploadErr;
+          const { data: urlData } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(filePath);
+          mediaUrls.push(urlData.publicUrl);
+        }
       }
 
       // 2. Insert post off-chain immediately
