@@ -4,9 +4,9 @@ pragma solidity 0.8.28;
 import {Script, console} from "forge-std/Script.sol";
 import {Customization} from "../src/Customization.sol";
 
-contract DeployCelo is Script {
+contract Deploy is Script {
     // @TODO: Add restricted nationalities
-    string[] restrictedNationalities = [""];
+    string[] restrictedNationalities = ["PRK", "IRN"];
 
     function run() external {
         vm.startBroadcast();
