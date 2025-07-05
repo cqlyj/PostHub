@@ -18,7 +18,7 @@ interface Post {
 }
 
 const ProfilePage: React.FC = () => {
-  const { user } = usePrivy();
+  const { user, logout } = usePrivy();
   const router = useRouter();
   const walletAddress = user?.wallet?.address ?? "";
 
@@ -117,6 +117,15 @@ const ProfilePage: React.FC = () => {
 
   // verified state already set
 
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+    } finally {
+      // Force redirect regardless of logout timing
+      router.push("/");
+    }
+  }, [logout, router]);
+
   return (
     <div className="flex flex-col min-h-screen bg-[var(--muted-bg)]">
       {/* Header */}
@@ -136,6 +145,12 @@ const ProfilePage: React.FC = () => {
         >
           {verified ? "Verified" : "Unverified"}
         </span>
+        <button
+          onClick={handleLogout}
+          className="text-xs text-red-500 underline mt-2 hover:opacity-80"
+        >
+          Log out
+        </button>
       </header>
 
       {/* Tabs */}
@@ -188,15 +203,22 @@ const ProfilePage: React.FC = () => {
         )}
         {tab === "update" && (
           <div className="flex flex-col items-center gap-4">
-            <p className="text-sm text-gray-600 text-center max-w-xs">
-              Customize your experience and verify your account by completing
-              the Self onboarding.
-            </p>
+            {verified ? (
+              <p className="text-sm text-gray-600 text-center max-w-xs">
+                You’re already verified! If you’d like to review or update your
+                info, you can do so anytime below.
+              </p>
+            ) : (
+              <p className="text-sm text-gray-600 text-center max-w-xs">
+                Verify your account to unlock the full PostHub experience
+                (age-appropriate content, gifting, and more).
+              </p>
+            )}
             <button
               onClick={() => router.push("/customize")}
               className="bg-[var(--primary)] text-white px-6 py-2 rounded-full shadow hover:opacity-90"
             >
-              {verified ? "Review Info" : "Get Verified"}
+              {verified ? "Update Info" : "Verify Now"}
             </button>
           </div>
         )}
