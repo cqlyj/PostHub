@@ -166,22 +166,14 @@ contract Customization is SelfVerificationRoot, Ownable {
         string memory year = Formatter.substring(dateOfBirth, 6, 8); // YY
 
         // Create the date after 18 years
-        string memory dobAfter18Years = string(
-            abi.encodePacked(year, month, day)
+
+        uint256 dobTs = Formatter.dateToUnixTimestamp(
+            string(abi.encodePacked(year, month, day))
         );
 
-        uint256 dobAfter18YearsTimestamp = Formatter.dateToUnixTimestamp(
-            dobAfter18Years
-        );
+        uint256 dobAfter18YearsTimestamp = dobTs + 18 * 365 days;
 
-        // Create the date after 55 years
-        string memory dobAfter55Years = string(
-            abi.encodePacked(year, month, day)
-        );
-
-        uint256 dobAfter55YearsTimestamp = Formatter.dateToUnixTimestamp(
-            dobAfter55Years
-        );
+        uint256 dobAfter55YearsTimestamp = dobTs + 55 * 365 days;
 
         uint256 currentTime = block.timestamp;
 
