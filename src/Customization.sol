@@ -14,20 +14,25 @@ contract Customization is SelfVerificationRoot, Ownable {
     bytes32 public configId;
 
     // Age over 55 or less 18
-    enum UserType {
-        RESTRICTED_MINOR_MALE,
-        RESTRICTED_MINOR_FEMALE,
-        RESTRICTED_ADULT_MALE,
-        RESTRICTED_ADULT_FEMALE,
-        RESTRICTED_SENIOR_MALE,
-        RESTRICTED_SENIOR_FEMALE,
-        MINOR_MALE,
-        MINOR_FEMALE,
-        ADULT_MALE,
-        ADULT_FEMALE,
-        SENIOR_MALE,
-        SENIOR_FEMALE
-    }
+
+    // enum UserType {
+    //     RESTRICTED_MINOR_MALE, // 0
+    //     RESTRICTED_MINOR_FEMALE, // 1
+    //     RESTRICTED_ADULT_MALE, // 2
+    //     RESTRICTED_ADULT_FEMALE, // 3
+    //     RESTRICTED_SENIOR_MALE, // 4
+    //     RESTRICTED_SENIOR_FEMALE, // 5
+    //     MINOR_MALE, // 6
+    //     MINOR_FEMALE, // 7
+    //     ADULT_MALE, // 8
+    //     ADULT_FEMALE, // 9
+    //     SENIOR_MALE, // 10
+    //     SENIOR_FEMALE // 11
+    // }
+
+    // If the user skip the verification, we will set the user type to 12 => Restricted Minor Unknown
+
+    uint8 public UserType;
 
     enum AgeRange {
         MINOR, // 0-18
@@ -35,13 +40,11 @@ contract Customization is SelfVerificationRoot, Ownable {
         SENIOR // 55+
     }
 
-    mapping(bytes world => UserType userType) public worldUserType;
-    mapping(bytes world => string nationality) public worldNationality;
+    mapping(address user => uint8 userType) public s_userType;
+    mapping(address user => string nationality) public s_userNationality;
     string[] public restrictedNationalities;
 
-    event VerificationDone(
-        bytes userData // Custom data => Unique ID for the from the World Mini App
-    );
+    event VerificationDone(address userAddress);
 
     constructor(
         address _identityVerificationHubV2, // V2 Hub address
@@ -59,13 +62,15 @@ contract Customization is SelfVerificationRoot, Ownable {
     }
 
     // Required: Override to provide configId for verification
+    // We don't verify stuffs, we customize stuffs
     function getConfigId(
         bytes32 /*destinationChainId*/,
         bytes32 /*userIdentifier*/,
         bytes memory /*userDefinedData*/ // Custom data from the qr code configuration
-    ) public view override returns (bytes32) {
+    ) public pure override returns (bytes32) {
         // Return app's configuration ID
-        return configId;
+        return
+            0x7b6436b0c98f62380866d9432c2af0ee08ce16a171bda6951aecd95ee1307d61;
     }
 
     function setScope(uint256 _scope) external onlyOwner {
@@ -76,21 +81,27 @@ contract Customization is SelfVerificationRoot, Ownable {
     // Override to handle successful verification
     function customVerificationHook(
         ISelfVerificationRoot.GenericDiscloseOutputV2 memory output,
-        bytes memory userData // Custom data => Unique ID for the from the World Mini App
+        bytes memory userData
     ) internal virtual override {
         _decideUserType(output, userData);
-        emit VerificationDone(userData);
+        emit VerificationDone(uint256ToAddress(output.userIdentifier));
     }
 
     /*//////////////////////////////////////////////////////////////
                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    function uint256ToAddress(
+        uint256 _uint256
+    ) internal pure returns (address) {
+        return address(uint160(_uint256));
+    }
+
     function _decideUserType(
         ISelfVerificationRoot.GenericDiscloseOutputV2 memory output,
-        bytes memory userData
+        bytes memory /*userData*/
     ) internal {
-        UserType userType;
+        uint8 userType;
 
         string memory userGender = output.gender;
         bool isRestricted = _isRestrictedNationality(output.nationality);
@@ -102,44 +113,45 @@ contract Customization is SelfVerificationRoot, Ownable {
         ) {
             if (isRestricted) {
                 if (ageRange == AgeRange.MINOR) {
-                    userType = UserType.RESTRICTED_MINOR_MALE; // Under 18, restricted
+                    userType = 0;
                 } else if (ageRange == AgeRange.ADULT) {
-                    userType = UserType.RESTRICTED_ADULT_MALE; // 18-55, restricted
+                    userType = 2;
                 } else {
-                    userType = UserType.RESTRICTED_SENIOR_MALE; // 55+, restricted
+                    userType = 4;
                 }
             } else {
                 if (ageRange == AgeRange.MINOR) {
-                    userType = UserType.MINOR_MALE; // Under 18, not restricted
+                    userType = 6; // Under 18, not restricted
                 } else if (ageRange == AgeRange.ADULT) {
-                    userType = UserType.ADULT_MALE; // 18-55, not restricted
+                    userType = 8; // 18-55, not restricted
                 } else {
-                    userType = UserType.SENIOR_MALE; // 55+, not restricted
+                    userType = 10; // 55+, not restricted
                 }
             }
         } else {
             if (isRestricted) {
                 if (ageRange == AgeRange.MINOR) {
-                    userType = UserType.RESTRICTED_MINOR_FEMALE; // Under 18, restricted
+                    userType = 1; // Under 18, restricted
                 } else if (ageRange == AgeRange.ADULT) {
-                    userType = UserType.RESTRICTED_ADULT_FEMALE; // 18-55, restricted
+                    userType = 3; // 18-55, restricted
                 } else {
-                    userType = UserType.RESTRICTED_SENIOR_FEMALE; // 55+, restricted
+                    userType = 5; // 55+, restricted
                 }
             } else {
                 if (ageRange == AgeRange.MINOR) {
-                    userType = UserType.MINOR_FEMALE; // Under 18, not restricted
+                    userType = 7; // Under 18, not restricted
                 } else if (ageRange == AgeRange.ADULT) {
-                    userType = UserType.ADULT_FEMALE; // 18-55, not restricted
+                    userType = 9; // 18-55, not restricted
                 } else {
-                    userType = UserType.SENIOR_FEMALE; // 55+, not restricted
+                    userType = 11; // 55+, not restricted
                 }
             }
         }
 
         // Store the user type in the mapping
-        worldUserType[userData] = userType;
-        worldNationality[userData] = output.nationality;
+        s_userType[uint256ToAddress(output.userIdentifier)] = userType;
+        s_userNationality[uint256ToAddress(output.userIdentifier)] = output
+            .nationality;
     }
 
     function _decideAgeRange(
