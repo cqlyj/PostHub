@@ -6,7 +6,10 @@ import PostCard from "@/components/PostCard";
 import BottomNav from "@/components/BottomNav";
 import { useRouter } from "next/navigation";
 import { getAvatarSrc } from "@/utils/avatar";
-import { resolveENS } from "@/utils/ens";
+import {
+  getDisplayName,
+  invalidateDisplayNameCache,
+} from "@/utils/displayName";
 import { fetchVerification } from "@/utils/verification";
 import { useSenior } from "@/components/SeniorModeProvider";
 
@@ -27,18 +30,38 @@ const ProfilePage: React.FC = () => {
   const avatarSrc = useMemo(() => getAvatarSrc(walletAddress), [walletAddress]);
 
   const [displayName, setDisplayName] = useState<string>("");
+  const [nameInput, setNameInput] = useState<string>("");
   const [verified, setVerified] = useState<boolean>(false);
 
-  // ENS & verification fetch
+  // Username / ENS & verification fetch
   useEffect(() => {
     if (!walletAddress) return;
-    resolveENS(walletAddress).then((name) => {
-      setDisplayName(
-        name ?? `${walletAddress.substring(0, 6)}…${walletAddress.slice(-4)}`
-      );
+    getDisplayName(walletAddress).then((n) => {
+      setDisplayName(n);
+      setNameInput(n);
     });
     fetchVerification(walletAddress).then((info) => setVerified(info.verified));
   }, [walletAddress]);
+
+  const [showSavedToast, setShowSavedToast] = useState(false);
+
+  const handleSaveName = async () => {
+    if (!walletAddress || !nameInput.trim()) return;
+    await supabase.from("usernames").upsert({
+      wallet_address: walletAddress.toLowerCase(),
+      username: nameInput.trim(),
+    });
+    invalidateDisplayNameCache(walletAddress);
+    setDisplayName(nameInput.trim());
+    setShowSavedToast(true);
+  };
+
+  // Auto-hide the toast after a few seconds
+  useEffect(() => {
+    if (!showSavedToast) return;
+    const t = setTimeout(() => setShowSavedToast(false), 3000);
+    return () => clearTimeout(t);
+  }, [showSavedToast]);
 
   const [tab, setTab] = useState<"posts" | "likes" | "stars" | "update">(
     "posts"
@@ -211,7 +234,30 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
         {tab === "update" && (
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 w-full">
+            {/* Username editor */}
+            <div className="bg-white rounded-lg shadow p-4 w-full max-w-sm flex flex-col gap-2">
+              <label htmlFor="username" className="text-sm font-medium">
+                Display Name
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                className="border rounded px-3 py-1 focus:outline-none"
+                placeholder="Enter your preferred name"
+              />
+              <button
+                onClick={handleSaveName}
+                className="bg-[var(--primary)] text-white px-4 py-1 rounded self-end disabled:opacity-50"
+                disabled={!nameInput.trim()}
+              >
+                Save
+              </button>
+            </div>
+
+            {/* Verification section */}
             {verified ? (
               <p className="text-sm text-gray-600 text-center max-w-xs">
                 You’re already verified! If you’d like to review or update your
@@ -232,6 +278,13 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* mobile-style toast */}
+      {showSavedToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-[var(--primary)] text-white px-4 py-2 rounded-full shadow-lg z-50 animate-fadeInOut">
+          Name updated!
+        </div>
+      )}
 
       <BottomNav />
     </div>
