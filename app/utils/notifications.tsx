@@ -1,6 +1,9 @@
+"use client";
+
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { usePrivy } from "@privy-io/react-auth";
+import { useRouter } from "next/navigation";
 
 export type NotificationType =
   | "like"
@@ -8,13 +11,16 @@ export type NotificationType =
   | "comment"
   | "reply"
   | "gift_sent"
-  | "gift_received";
+  | "gift_received"
+  | "comment_like";
 
 export interface NotificationItem {
   id: string;
   type: NotificationType;
   text: string;
   timestamp: number;
+  link?: string;
+  read: boolean; // whether the user has opened/read this notification
 }
 
 const STORAGE_KEY = "posthub_notifications_v1";
@@ -26,7 +32,11 @@ function load(): NotificationItem[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed)) {
+      // Back-compat: if older entries have no `read` flag, assume they were read
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return parsed.map((n: any) => ({ ...n, read: n.read ?? true }));
+    }
   } catch {
     /* ignore corrupted storage */
   }
@@ -40,27 +50,63 @@ function save(list: NotificationItem[]) {
 
 interface ContextValue {
   notifications: NotificationItem[];
-  add: (n: Omit<NotificationItem, "id" | "timestamp">) => void;
+  add: (n: Omit<NotificationItem, "id" | "timestamp" | "read">) => void;
+  markRead: (id: string) => void;
+  markAllRead: () => void;
   clear: () => void;
 }
 
 const NotificationsContext = createContext<ContextValue | undefined>(undefined);
 
-// Helper to broadcast a realtime message to a specific wallet address.
-// It does NOT store anything in the recipient's DB – the recipient's NotificationProvider
-// will receive the broadcast and call `add` locally to show a toast + persist in its own localStorage.
-export async function sendNotification(
-  recipient: string,
-  type: NotificationType
-) {
-  if (!recipient) return;
-  // Fire-and-forget. We don't await subscription success; `send` works without it.
-  const channel = supabase.channel("realtime_notifications");
-  channel.send({
-    type: "broadcast",
-    event: "notify",
-    payload: { recipient, type },
+export type NotificationPayload = {
+  recipient: string;
+  actor: string;
+  postId: string;
+  type: NotificationType;
+  commentId?: string;
+};
+
+export async function sendNotification(payload: NotificationPayload) {
+  if (!payload.recipient) return;
+
+  const channel = getNotificationChannel();
+
+  // Ensure we've joined the channel before sending. If we're already joined
+  // (`SUBSCRIBED`) this resolves immediately.
+  await new Promise<void>((resolve, reject) => {
+    if (channel.state === "joined") {
+      resolve();
+      return;
+    }
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") resolve();
+      if (
+        status === "CLOSED" ||
+        status === "CHANNEL_ERROR" ||
+        status === "TIMED_OUT"
+      )
+        reject(new Error("Failed to subscribe to notifications channel"));
+    });
   });
+
+  try {
+    // Wait for server ACK so we know the message has actually been accepted.
+    await channel.send({ type: "broadcast", event: "notify", payload });
+  } catch (err) {
+    console.error("Failed to broadcast notification", err);
+  }
+}
+
+function getNotificationChannel() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const w = typeof window !== "undefined" ? (window as any) : {};
+  if (!w.__posthub_notify_channel) {
+    w.__posthub_notify_channel = supabase.channel("realtime_notifications", {
+      // Ask the server to acknowledge the message so we can detect failures.
+      config: { broadcast: { ack: true } },
+    });
+  }
+  return w.__posthub_notify_channel as ReturnType<typeof supabase.channel>;
 }
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -69,11 +115,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [toast, setToast] = useState<NotificationItem | null>(null);
 
-  // user wallet address via Privy
   const { user } = usePrivy();
+  const router = useRouter();
   const walletAddress = user?.wallet?.address ?? "";
 
-  // Load on mount
   useEffect(() => {
     setNotifications(load());
   }, []);
@@ -85,14 +130,56 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           ...n,
           id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
           timestamp: Date.now(),
+          read: false,
         },
         ...prev,
       ].slice(0, MAX_ITEMS);
       save(newList);
       const newest = newList[0];
-      // trigger toast
       setToast(newest);
       return newList;
+    });
+  };
+
+  const markRead: ContextValue["markRead"] = (id) => {
+    setNotifications((prev) => {
+      // Find the notification we’re marking so we can dedupe by underlying event.
+      const target = prev.find((n) => n.id === id);
+
+      const updated = prev.map((n) => {
+        // 1. Mark the explicit target as read
+        if (n.id === id) return { ...n, read: true };
+
+        if (!target) return n; // safety – shouldn’t happen
+
+        // 2. Duplicate detection logic.
+        const sameType = n.type === target.type;
+
+        // a) Links are identical → definitely same event
+        if (sameType && target.link && n.link === target.link) {
+          return { ...n, read: true };
+        }
+
+        // b) One of the entries has no link (legacy entry). Treat as duplicate
+        //    if timestamps are very close (10 s) – they derive from the same DB action.
+        const timeClose = Math.abs(n.timestamp - target.timestamp) < 10_000;
+        if (sameType && timeClose && (!n.link || !target.link)) {
+          return { ...n, read: true };
+        }
+
+        return n;
+      });
+
+      save(updated);
+      return updated;
+    });
+  };
+
+  const markAllRead: ContextValue["markAllRead"] = () => {
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, read: true }));
+      save(updated);
+      return updated;
     });
   };
 
@@ -101,43 +188,41 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     save([]);
   };
 
-  // Auto-dismiss toast
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(t);
   }, [toast]);
 
-  // Supabase realtime listeners – likes, stars, comments
   useEffect(() => {
     if (!walletAddress) return;
 
-    // Helper to ignore self actions
     const isSelf = (addr?: string | null) =>
       addr && addr.toLowerCase() === walletAddress.toLowerCase();
 
-    const channel = supabase.channel("realtime_notifications");
+    const channel = getNotificationChannel();
 
-    // Likes
     channel.on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "likes" },
       async (payload) => {
         const row = payload.new as { post_id: string; user_address: string };
         if (isSelf(row.user_address)) return;
-        // fetch post to check author
         const { data: post } = await supabase
           .from("posts")
           .select("author")
           .eq("id", row.post_id)
           .single();
         if (post?.author && isSelf(post.author)) {
-          add({ type: "like", text: "Someone liked your post" });
+          add({
+            type: "like",
+            text: "Someone liked your post",
+            link: `/post/${row.post_id}`,
+          });
         }
       }
     );
 
-    // Stars
     channel.on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "stars" },
@@ -150,12 +235,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           .eq("id", row.post_id)
           .single();
         if (post?.author && isSelf(post.author)) {
-          add({ type: "star", text: "Someone starred your post" });
+          add({
+            type: "star",
+            text: "Someone starred your post",
+            link: `/post/${row.post_id}`,
+          });
         }
       }
     );
 
-    // Comments & Replies
     channel.on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "comments" },
@@ -169,65 +257,125 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         if (isSelf(row.author)) return;
 
         if (row.parent_comment_id) {
-          // it is a reply – check if parent comment is mine
           const { data: parent } = await supabase
             .from("comments")
             .select("author")
             .eq("id", row.parent_comment_id)
             .single();
           if (parent?.author && isSelf(parent.author)) {
-            add({ type: "reply", text: "Someone replied to your comment" });
+            add({
+              type: "reply",
+              text: "Someone replied to your comment",
+              link: `/post/${row.post_id}#comment-${row.id}`,
+            });
           }
         } else {
-          // normal comment – check if post is mine
           const { data: post } = await supabase
             .from("posts")
             .select("author")
             .eq("id", row.post_id)
             .single();
           if (post?.author && isSelf(post.author)) {
-            add({ type: "comment", text: "Someone commented on your post" });
+            add({
+              type: "comment",
+              text: "Someone commented on your post",
+              link: `/post/${row.post_id}#comment-${row.id}`,
+            });
           }
         }
       }
     );
 
-    // Broadcast listener – receives notifications sent from other clients
+    // Comment likes
     channel.on(
-      "broadcast",
-      { event: "notify" },
-      ({ payload }) => {
-        const data = payload as { recipient: string; type: NotificationType };
-        if (!data || !data.recipient || !data.type) return;
-        if (!isSelf(data.recipient)) return;
-
-        // Map to user-friendly text (same as DB change handlers)
-        const textMap: Record<NotificationType, string> = {
-          like: "Someone liked your post",
-          star: "Someone starred your post",
-          comment: "Someone commented on your post",
-          reply: "Someone replied to your comment",
-          gift_sent: "You sent a gift", // unlikely to be received – sender side only
-          gift_received: "Someone sent you a gift",
-        } as const;
-
-        add({ type: data.type, text: textMap[data.type] });
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "comment_likes" },
+      async (payload) => {
+        const row = payload.new as { comment_id: string; user_address: string };
+        if (isSelf(row.user_address)) return; // ignore self
+        // fetch comment to check author
+        const { data: c } = await supabase
+          .from("comments")
+          .select("author, post_id")
+          .eq("id", row.comment_id)
+          .single();
+        if (c?.author && isSelf(c.author)) {
+          add({
+            type: "comment_like",
+            text: "Someone liked your comment",
+            link: `/post/${c.post_id}#comment-${row.comment_id}`,
+          });
+        }
       }
     );
 
-    channel.subscribe();
+    channel.on("broadcast", { event: "notify" }, ({ payload }) => {
+      const data = payload as NotificationPayload;
+      if (!data || !data.recipient || !data.type) return;
+      if (!isSelf(data.recipient)) return;
 
+      const short = `${data.actor.slice(0, 6)}…${data.actor.slice(-4)}`;
+      const verbMap: Record<NotificationType, string> = {
+        like: "liked your post",
+        star: "starred your post",
+        comment: "commented on your post",
+        reply: "replied to your comment",
+        gift_sent: "sent a gift",
+        gift_received: "sent you a gift",
+        comment_like: "liked your comment",
+      } as const;
+
+      const text = `${short} ${verbMap[data.type]}`;
+      const link = `/post/${data.postId}${
+        data.commentId ? `#comment-${data.commentId}` : ""
+      }`;
+
+      add({ type: data.type, text, link });
+    });
+
+    // Subscribe if we haven't yet and make sure we auto-reconnect on errors.
+    if (channel.state !== "joined" && channel.state !== "joining") {
+      channel.subscribe((status) => {
+        if (
+          status === "CLOSED" ||
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT"
+        ) {
+          // Attempt to resubscribe after a short delay.
+          console.warn(
+            `Notifications channel lost (status: ${status}). Reconnecting…`
+          );
+          setTimeout(() => {
+            if (channel.state !== "joined" && channel.state !== "joining") {
+              channel.subscribe();
+            }
+          }, 1000);
+        }
+      });
+    }
+
+    // No need to explicitly remove the shared channel – it is reused across the
+    // entire session. Cleaning up here would break other listeners or broadcasts.
     return () => {
-      supabase.removeChannel(channel);
+      /* noop */
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletAddress]);
 
   return (
-    <NotificationsContext.Provider value={{ notifications, add, clear }}>
+    <NotificationsContext.Provider
+      value={{ notifications, add, markRead, markAllRead, clear }}
+    >
       {children}
       {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-[var(--primary)] text-white px-4 py-2 rounded-full shadow-lg z-50 animate-fadeInOut">
+        <div
+          className="fixed top-4 left-1/2 -translate-x-1/2 bg-[var(--primary)] text-white px-4 py-2 rounded-full shadow-lg z-50 animate-fadeInOut cursor-pointer"
+          onClick={() => {
+            // Mark it as read immediately
+            markRead(toast.id);
+            if (toast.link) router.push(toast.link);
+          }}
+        >
           {toast.text}
         </div>
       )}
