@@ -17,10 +17,12 @@ import { fetchVerification } from "@/utils/verification";
 import BottomNav from "@/components/BottomNav";
 import { supabase } from "@/lib/supabaseClient";
 import PostCard from "@/components/PostCard";
+import { useSenior } from "@/components/SeniorModeProvider";
 
 // On-chain constants not needed for UI-only explore page
 
 const ExplorePage = () => {
+  const { isSenior } = useSenior();
   const { user, logout, authenticated } = usePrivy();
   // const [userType, setUserType] = useState<string | null>(null);
   const router = useRouter();
@@ -154,7 +156,9 @@ const ExplorePage = () => {
         {loading && (
           <p className="text-center text-sm text-gray-500 mb-2">Loading...</p>
         )}
-        <div className="grid grid-cols-2 gap-2">
+        <div
+          className={`grid ${isSenior ? "grid-cols-1" : "grid-cols-2"} gap-2`}
+        >
           {posts.map((post) => (
             <PostCard key={post.id} post={post} />
           ))}
