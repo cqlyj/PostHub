@@ -6,7 +6,7 @@ const CELO_RPC =
 const CUSTOMIZATION_ADDRESS =
   (process.env.NEXT_PUBLIC_CUSTOMIZATION_CONTRACT as
     | `0x${string}`
-    | undefined) ?? "0x1ba052bd126d7c5ee3a4baeaf51e3cc2eebd32d7";
+    | undefined) ?? "0xbd0Efe0890B8107fDa1495754ccb25FdbCCcE2aF";
 
 // Minimal ABI for the mapping getters
 const ABI = [
