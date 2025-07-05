@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { fetchVerification } from "@/utils/verification";
+import { userTypeToAgeGroup } from "@/utils/searchRanking";
 
 interface SeniorCtx {
   isSenior: boolean;
@@ -24,7 +25,17 @@ export const SeniorModeProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
       const info = await fetchVerification(user.wallet.address);
-      const senior = [4, 5, 10, 11].includes(info.userType);
+      const senior = userTypeToAgeGroup(info.userType) === "senior";
+      if (process.env.NODE_ENV !== "production") {
+        // helpful debug for developers
+        // eslint-disable-next-line no-console
+        console.log(
+          "[SeniorMode] userType",
+          info.userType,
+          "-> senior",
+          senior
+        );
+      }
       setIsSenior(senior);
       if (senior) {
         document.documentElement.classList.add("senior-mode");
