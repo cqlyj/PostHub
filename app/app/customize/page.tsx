@@ -24,7 +24,7 @@ const CustomizePage = () => {
     return new SelfAppBuilder({
       appName: "PostHub",
       scope: "posthub", // Must match backend/on-chain verifier
-      endpoint: "0x1bA052BD126d7C5EE3A4baEAF51e3cc2eeBd32D7",
+      endpoint: "0xbd0Efe0890B8107fDa1495754ccb25FdbCCcE2aF",
       endpointType: "staging_celo",
       userId: address, // Use wallet address for on-chain verification
       userIdType: "hex", // use 'hex' for ethereum address or 'uuid' for uuidv4
