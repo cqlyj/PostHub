@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
+import { getDisplayName } from "@/utils/displayName";
 
 export type NotificationType =
   | "like"
@@ -214,9 +215,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           .eq("id", row.post_id)
           .single();
         if (post?.author && isSelf(post.author)) {
+          const actorName = await getDisplayName(row.user_address);
           add({
             type: "like",
-            text: "Someone liked your post",
+            text: `${actorName} liked your post`,
             link: `/post/${row.post_id}`,
           });
         }
@@ -235,9 +237,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           .eq("id", row.post_id)
           .single();
         if (post?.author && isSelf(post.author)) {
+          const actorName = await getDisplayName(row.user_address);
           add({
             type: "star",
-            text: "Someone starred your post",
+            text: `${actorName} starred your post`,
             link: `/post/${row.post_id}`,
           });
         }
@@ -263,9 +266,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
             .eq("id", row.parent_comment_id)
             .single();
           if (parent?.author && isSelf(parent.author)) {
+            const actorName = await getDisplayName(row.author);
             add({
               type: "reply",
-              text: "Someone replied to your comment",
+              text: `${actorName} replied to your comment`,
               link: `/post/${row.post_id}#comment-${row.id}`,
             });
           }
@@ -276,9 +280,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
             .eq("id", row.post_id)
             .single();
           if (post?.author && isSelf(post.author)) {
+            const actorName = await getDisplayName(row.author);
             add({
               type: "comment",
-              text: "Someone commented on your post",
+              text: `${actorName} commented on your post`,
               link: `/post/${row.post_id}#comment-${row.id}`,
             });
           }
@@ -300,21 +305,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
           .eq("id", row.comment_id)
           .single();
         if (c?.author && isSelf(c.author)) {
+          const actorName = await getDisplayName(row.user_address);
           add({
             type: "comment_like",
-            text: "Someone liked your comment",
+            text: `${actorName} liked your comment`,
             link: `/post/${c.post_id}#comment-${row.comment_id}`,
           });
         }
       }
     );
 
-    channel.on("broadcast", { event: "notify" }, ({ payload }) => {
+    channel.on("broadcast", { event: "notify" }, async ({ payload }) => {
       const data = payload as NotificationPayload;
       if (!data || !data.recipient || !data.type) return;
       if (!isSelf(data.recipient)) return;
 
-      const short = `${data.actor.slice(0, 6)}…${data.actor.slice(-4)}`;
+      const actorName = await getDisplayName(data.actor);
       const verbMap: Record<NotificationType, string> = {
         like: "liked your post",
         star: "starred your post",
@@ -325,7 +331,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         comment_like: "liked your comment",
       } as const;
 
-      const text = `${short} ${verbMap[data.type]}`;
+      const text = `${actorName} ${verbMap[data.type]}`;
       const link = `/post/${data.postId}${
         data.commentId ? `#comment-${data.commentId}` : ""
       }`;
