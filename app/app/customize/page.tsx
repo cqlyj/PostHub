@@ -66,7 +66,8 @@ const CustomizePage = () => {
           Customize Your Experience
         </h2>
         <p className="text-sm text-[var(--muted-text)]">
-          Scan the QR code with the Self app to customize your experience.
+          Scan to customize your experience — age, gender, and country help us
+          show you the right content and protect your privacy.
         </p>
         {!completed && (
           <>
