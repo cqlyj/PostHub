@@ -13,6 +13,20 @@ import { usePrivy } from "@privy-io/react-auth";
 import { getAvatarSrc } from "@/utils/avatar";
 import { resolveENS } from "@/utils/ens";
 import { ethers } from "ethers";
+import GiftModal from "@/components/GiftModal";
+import GiftAnimationOverlay, {
+  GiftOption as GiftOptionType,
+} from "@/components/GiftAnimationOverlay";
+import { isVideoUrl, extractSamsungMotionPhoto } from "@/utils/media";
+
+type GiftOption = GiftOptionType;
+
+const GIFT_OPTIONS: GiftOption[] = [
+  { amount: 1, emoji: "🌸", name: "Flower", description: "Light Thanks" },
+  { amount: 3, emoji: "🎉", name: "Confetti", description: "Applause" },
+  { amount: 5, emoji: "🚗", name: "Car", description: "Fan Love" },
+  { amount: 10, emoji: "🚀", name: "Rocket", description: "Superfan" },
+];
 
 const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
   // unwrap params promise (Next.js 14)
@@ -54,6 +68,13 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
   const [liked, setLiked] = useState(false);
   const [starred, setStarred] = useState(false);
   const [txConfirmed, setTxConfirmed] = useState<boolean | null>(null);
+  const [giftOpen, setGiftOpen] = useState(false);
+  const [animData, setAnimData] = useState<{
+    option: GiftOption;
+    txHash: string;
+    visible: boolean;
+    confirmed: boolean;
+  } | null>(null);
 
   const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET ?? "post-media";
   const COMMENT_MAX_MEDIA = 3;
@@ -226,6 +247,77 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
     }
   };
 
+  const handleGiftSelect = async (option: GiftOption) => {
+    setGiftOpen(false);
+    if (!user?.wallet?.address) {
+      alert("Connect your wallet to send gifts");
+      return;
+    }
+
+    if (!post) return; // safeguard
+
+    try {
+      // Browser provider from injected wallet (e.g., Metamask or Privy embedded)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ethProvider = (window as any).ethereum;
+      if (!ethProvider) {
+        alert("Ethereum provider not found");
+        return;
+      }
+
+      const provider = new ethers.BrowserProvider(ethProvider);
+      const signer = await provider.getSigner();
+
+      // USDC ERC-20 contract (mock)
+      const USDC_ADDRESS =
+        process.env.NEXT_PUBLIC_USDC_ADDRESS ||
+        "0xa7FbcaAD0D4c2e8188b386B7C3951E1e0792Bf8E"; // fallback
+
+      const ERC20_ABI = [
+        "function decimals() view returns (uint8)",
+        "function transfer(address to, uint256 amount) returns (bool)",
+      ];
+
+      const token = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, signer);
+
+      // Determine token decimals (USDC mock likely 6)
+      let decimals = 6;
+      try {
+        decimals = await token.decimals();
+      } catch {
+        /* ignore, use default */
+      }
+
+      const amount = ethers.parseUnits(option.amount.toString(), decimals);
+
+      const recipient = post!.author; // non-null assertion after earlier guard
+      const tx = await token.transfer(recipient, amount);
+
+      // open animation overlay
+      setAnimData({ option, txHash: tx.hash, visible: true, confirmed: false });
+
+      // wait for confirmation in background
+      provider
+        .waitForTransaction(tx.hash)
+        .then(() => {
+          setAnimData((d) => {
+            if (d && d.txHash === tx.hash) {
+              const updated = { ...d, confirmed: true };
+              if (!updated.visible) {
+                alert(`Gift confirmed! Tx: ${tx.hash.substring(0, 10)}…`);
+              }
+              return updated;
+            }
+            return d;
+          });
+        })
+        .catch((err) => console.error("Wait tx error", err));
+    } catch (err) {
+      console.error("Gift send failed", err);
+      alert("Failed to send gift: " + (err as Error).message);
+    }
+  };
+
   const toggleCommentLike = useCallback(
     async (commentId: string) => {
       if (!user?.wallet?.address) return;
@@ -339,24 +431,37 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
     // upload images first
     const mediaUrls: string[] = [];
     for (const file of commentFiles) {
-      const ext = file.name.split(".").pop();
-      const filePath = `${author}/${Date.now()}-${Math.random()
-        .toString(36)
-        .substring(2)}.${ext}`;
-      const { error: uploadErr } = await supabase.storage
-        .from(bucket)
-        .upload(filePath, file, {
-          upsert: false,
-          contentType: file.type,
-        });
-      if (uploadErr) {
-        alert("Failed to upload image");
-        return;
+      const blobs: { blob: Blob | File; ext: string; type: string }[] = [];
+      if (file.type === "image/jpeg") {
+        const videoBlob = await extractSamsungMotionPhoto(file);
+        if (videoBlob)
+          blobs.push({ blob: videoBlob, ext: "mp4", type: "video/mp4" });
       }
-      const { data: urlData } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(filePath);
-      mediaUrls.push(urlData.publicUrl);
+      blobs.push({
+        blob: file,
+        ext: file.name.split(".").pop() || "",
+        type: file.type,
+      });
+
+      for (const { blob, ext, type } of blobs) {
+        const filePath = `${author}/${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2)}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from(bucket)
+          .upload(filePath, blob, {
+            upsert: false,
+            contentType: type,
+          });
+        if (uploadErr) {
+          alert("Failed to upload image");
+          return;
+        }
+        const { data: urlData } = supabase.storage
+          .from(bucket)
+          .getPublicUrl(filePath);
+        mediaUrls.push(urlData.publicUrl);
+      }
     }
 
     let finalContent = commentInput.trim();
@@ -407,11 +512,22 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
                 key={idx}
                 className="snap-center flex-shrink-0 w-full flex items-center justify-center bg-white aspect-[3/4]"
               >
-                <img
-                  src={url}
-                  className="max-w-full max-h-full object-contain"
-                  alt="media"
-                />
+                {isVideoUrl(url) ? (
+                  <video
+                    src={url}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="max-w-full max-h-full object-contain"
+                  />
+                ) : (
+                  <img
+                    src={url}
+                    className="max-w-full max-h-full object-contain"
+                    alt="media"
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -454,7 +570,11 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
             <span>{starred ? "⭐" : "☆"}</span>
             <span className="text-sm">{starsCount}</span>
           </button>
-          {!post.is_restricted && <button className="ml-auto">🎁</button>}
+          {!post.is_restricted && (
+            <button onClick={() => setGiftOpen(true)} className="ml-auto">
+              🎁
+            </button>
+          )}
         </div>
         <div className="prose p-4 max-w-none">
           <h1 className="text-2xl font-bold mb-4">{post.title}</h1>
@@ -539,6 +659,22 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
           </button>
         </div>
       </div>
+      {giftOpen && (
+        <GiftModal
+          options={GIFT_OPTIONS}
+          onClose={() => setGiftOpen(false)}
+          onSelect={handleGiftSelect}
+        />
+      )}
+
+      {animData && animData.visible && (
+        <GiftAnimationOverlay
+          option={animData.option}
+          txHash={animData.txHash}
+          confirmed={animData.confirmed}
+          onClose={() => setAnimData({ ...animData, visible: false })}
+        />
+      )}
     </div>
   );
 };
