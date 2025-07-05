@@ -11,7 +11,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { extractSamsungMotionPhoto } from "@/utils/media";
 // On-chain constants to fetch user type for tags
-const CONTRACT_ADDRESS = "0x1bA052BD126d7C5EE3A4baEAF51e3cc2eeBd32D7";
+const CONTRACT_ADDRESS = "0xbd0Efe0890B8107fDa1495754ccb25FdbCCcE2aF";
 const CELO_TESTNET_RPC = "https://alfajores-forno.celo-testnet.org";
 const ABI = ["function s_userType(address) view returns (uint8)"];
 const LABELS = [
