@@ -8,7 +8,7 @@ import { ethers } from "ethers";
 import Image from "next/image";
 import AnimatedAvatars from "@/components/AnimatedAvatars";
 // Address of the deployed Customization contract on Flow Mainnet EVM
-const CONTRACT_ADDRESS = "0x1bA052BD126d7C5EE3A4baEAF51e3cc2eeBd32D7";
+const CONTRACT_ADDRESS = "0xbd0Efe0890B8107fDa1495754ccb25FdbCCcE2aF";
 // Minimal ABI to read nationality mapping
 const NAT_ABI = ["function s_userNationality(address) view returns (string)"];
 // Celo Alfajores (testnet) RPC for on-chain reads
