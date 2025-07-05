@@ -304,3 +304,16 @@ body {
   text-decoration: underline;
   word-break: break-all;
 }
+
+/* =========================== */
+/*  Senior mode accessibility  */
+/* =========================== */
+:root.senior-mode {
+  font-size: 110%;
+}
+
+@media (min-width: 768px) {
+  :root.senior-mode {
+    font-size: 120%;
+  }
+}
