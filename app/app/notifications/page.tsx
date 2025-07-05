@@ -5,8 +5,10 @@ import { useNotifications } from "@/utils/notifications";
 import { useRouter } from "next/navigation";
 
 const NotificationsPage: React.FC = () => {
-  const { notifications, clear } = useNotifications();
+  const { notifications, markAllRead, markRead, clear } = useNotifications();
   const router = useRouter();
+
+  const unread = notifications.some((n) => !n.read);
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--muted-bg)]">
@@ -20,6 +22,14 @@ const NotificationsPage: React.FC = () => {
         <h1 className="font-semibold text-[var(--primary)] flex-1">
           Notifications
         </h1>
+        {unread && (
+          <button
+            onClick={markAllRead}
+            className="text-xs text-[var(--primary)] underline mr-2"
+          >
+            Mark all read
+          </button>
+        )}
         {notifications.length > 0 && (
           <button onClick={clear} className="text-xs text-red-500 underline">
             Clear
@@ -33,7 +43,13 @@ const NotificationsPage: React.FC = () => {
           notifications.map((n) => (
             <div
               key={n.id}
-              className="bg-white rounded-lg shadow p-3 text-sm flex items-center gap-2"
+              className={`bg-white rounded-lg shadow p-3 text-sm flex items-center gap-2 cursor-pointer hover:bg-gray-50 ${
+                !n.read ? "font-semibold" : "opacity-70"
+              }`}
+              onClick={() => {
+                if (n.link) router.push(n.link);
+                if (!n.read) markRead(n.id);
+              }}
             >
               <span className="text-lg">
                 {n.type === "like" && "❤️"}
