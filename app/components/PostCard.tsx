@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { getAvatarSrc } from "@/utils/avatar";
-import { resolveENS } from "@/utils/ens";
+import { getDisplayName } from "@/utils/displayName";
 import { isVideoUrl } from "@/utils/media";
 
 interface PostCardProps {
@@ -36,13 +36,8 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       setLikesCount(count ?? 0);
     };
     fetchLikes();
-    resolveENS(post.author ?? "").then((name) => {
-      if (name) setDisplayName(name);
-      else if (post.author)
-        setDisplayName(
-          `${post.author.substring(0, 6)}…${post.author.slice(-4)}`
-        );
-    });
+    if (!post.author) return;
+    getDisplayName(post.author).then((name) => setDisplayName(name));
   }, [post.id, post.author]);
 
   return (
