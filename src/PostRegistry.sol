@@ -4,10 +4,10 @@ pragma solidity 0.8.28;
 contract PostRegistry {
     struct PostMetadata {
         address author;
-        string blobId; // Walrus blob hash
         string title;
         string summary;
         uint256 timestamp;
+        string[] mediaLinks;
     }
 
     mapping(uint256 postCount => PostMetadata postMetadata) public s_posts;
@@ -17,35 +17,28 @@ contract PostRegistry {
     event PostCreated(
         uint256 indexed postId,
         address indexed author,
-        string blobId,
         string title,
         string summary,
         uint256 timestamp
     );
 
     function createPost(
-        string memory blobId,
+        address author,
         string memory title,
-        string memory summary
+        string memory summary,
+        string[] memory mediaLinks
     ) external {
         s_posts[s_postCount] = PostMetadata(
-            msg.sender,
-            blobId,
+            author,
             title,
             summary,
-            block.timestamp
+            block.timestamp,
+            mediaLinks
         );
 
-        s_postsByAuthor[msg.sender].push(s_postCount);
+        s_postsByAuthor[author].push(s_postCount);
 
-        emit PostCreated(
-            s_postCount,
-            msg.sender,
-            blobId,
-            title,
-            summary,
-            block.timestamp
-        );
+        emit PostCreated(s_postCount, author, title, summary, block.timestamp);
         s_postCount++;
     }
 
