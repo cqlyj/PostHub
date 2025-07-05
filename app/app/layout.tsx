@@ -3,6 +3,7 @@
 import "./globals.css";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { SeniorModeProvider } from "@/components/SeniorModeProvider";
+import { NotificationProvider } from "@/utils/notifications";
 
 export default function RootLayout({
   children,
@@ -23,7 +24,9 @@ export default function RootLayout({
             },
           }}
         >
-          <SeniorModeProvider>{children}</SeniorModeProvider>
+          <NotificationProvider>
+            <SeniorModeProvider>{children}</SeniorModeProvider>
+          </NotificationProvider>
         </PrivyProvider>
       </body>
     </html>
