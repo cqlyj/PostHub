@@ -10,9 +10,12 @@
   },
   "dependencies": {
     "@privy-io/react-auth": "^2.17.3",
+    "@selfxyz/qrcode": "^1.0.10-beta.1",
     "next": "15.3.5",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "uuid": "^9.0.0",
+    "ethers": "^6.9.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
