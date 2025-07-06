@@ -111,7 +111,7 @@ const Page = () => {
         />
         {/* Tagline */}
         <p className="text-2xl md:text-3xl font-hand font-bold text-gray-700">
-          Your decentralized hub for sharing moments
+          Share moments, Help others
         </p>
         <button
           onClick={handleClick}
