@@ -9,6 +9,14 @@ const ERC20_ABI = [
   "function transfer(address to,uint256 amount) returns (bool)",
 ];
 
+// Post Winner POAP contract configuration
+const POAP_ADDRESS =
+  process.env.POAP_CONTRACT_ADDRESS ||
+  "0x9A5CF28f9dC827a367C2a0eFF4b4f02bD589DB67";
+const POAP_ABI = [
+  "function mintPoap(address to,uint256 week,uint256 likes,uint256 stars,uint256 postId) returns (uint256)",
+];
+
 // Flow EVM RPC endpoint (reuse env from random route or fallback)
 const RPC_URL =
   process.env.FLOW_EVM_RPC_URL || "https://mainnet.evm.nodes.onflow.org";
@@ -77,6 +85,21 @@ export async function POST(req: NextRequest) {
       if (updateErr) {
         console.error("Failed to update reward log to success", updateErr);
       }
+    }
+
+    // Mint Post Winner POAP badge for the winner (non-blocking)
+    try {
+      const poap = new ethers.Contract(POAP_ADDRESS, POAP_ABI, wallet);
+      const now = new Date();
+      const week =
+        Math.floor(
+          (now.getTime() - Date.UTC(now.getUTCFullYear(), 0, 1)) /
+            (7 * 24 * 60 * 60 * 1000)
+        ) + 1;
+      await poap.mintPoap(recipient, week, 0, 0, 0);
+    } catch (mintErr) {
+      console.error("POAP mint failed", mintErr);
+      // Do not revert overall reward processing if POAP mint fails
     }
 
     return NextResponse.json({ hash: tx.hash }, { status: 200 });
