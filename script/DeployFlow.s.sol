@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Script, console} from "forge-std/Script.sol";
 import {PostRegistry} from "../src/PostRegistry.sol";
 import {MockUsdc} from "../src/MockUsdc.sol";
+import {PostWinnerPOAP} from "../src/PostWinnerPOAP.sol";
 
 contract DeployFlow is Script {
     function run() external {
@@ -14,6 +15,9 @@ contract DeployFlow is Script {
 
         MockUsdc mockUsdc = new MockUsdc();
         console.log("MockUsdc deployed at:", address(mockUsdc));
+
+        PostWinnerPOAP postWinnerPOAP = new PostWinnerPOAP();
+        console.log("PostWinnerPOAP deployed at:", address(postWinnerPOAP));
 
         vm.stopBroadcast();
     }
