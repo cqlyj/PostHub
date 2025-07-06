@@ -11,6 +11,7 @@ import {
   invalidateDisplayNameCache,
 } from "@/utils/displayName";
 import { fetchVerification } from "@/utils/verification";
+import PoapBadgeForAddress from "@/components/PoapBadgeForAddress";
 import { useSenior } from "@/components/SeniorModeProvider";
 
 interface Post {
@@ -164,6 +165,7 @@ const ProfilePage: React.FC = () => {
         <p className="text-lg font-semibold text-[var(--primary)] truncate max-w-xs">
           {displayName || "Anonymous"}
         </p>
+        <PoapBadgeForAddress address={walletAddress} size={24} />
         <span
           className={`text-xs px-2 py-0.5 rounded-full ${
             verified ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
