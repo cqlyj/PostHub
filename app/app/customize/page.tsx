@@ -62,7 +62,7 @@ const CustomizePage = () => {
     <main className="relative min-h-screen flex items-center justify-center bg-white p-4 text-center">
       <AnimatedAvatars />
       <div className="relative z-10 bg-white px-8 py-12 rounded-xl shadow-2xl flex flex-col items-center gap-6 fade-in-up w-full max-w-md">
-        <h2 className="text-3xl font-bold text-[var(--primary)]">
+        <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--primary)]">
           Customize Your Experience
         </h2>
         <p className="text-sm text-[var(--muted-text)]">
@@ -80,14 +80,14 @@ const CustomizePage = () => {
             {deeplink && (
               <a
                 href={deeplink}
-                className="mt-4 text-[var(--primary)] underline hover:opacity-80"
+                className="mt-4 rounded-full bg-[var(--primary)] text-white px-6 py-2 font-semibold shadow-md hover:opacity-90 transition"
               >
-                Open in Self app
+                Open in Self App
               </a>
             )}
             <button
               onClick={() => setCompleted(true)}
-              className="mt-4 text-[var(--primary)] underline hover:opacity-80"
+              className="mt-2 text-sm text-[var(--primary)] hover:underline"
             >
               Skip for now
             </button>
