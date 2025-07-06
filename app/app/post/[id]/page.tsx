@@ -19,6 +19,7 @@ import GiftAnimationOverlay, {
 } from "@/components/GiftAnimationOverlay";
 import { isVideoUrl, extractSamsungMotionPhoto } from "@/utils/media";
 import { sendNotification } from "@/utils/notifications";
+import PoapBadgeForAddress from "@/components/PoapBadgeForAddress";
 
 type GiftOption = GiftOptionType;
 
@@ -417,7 +418,8 @@ const PostDetail = ({ params }: { params: Promise<{ id: string }> }) => {
               className="w-4 h-4 rounded-full"
               alt="avatar"
             />
-            {c.displayName} • {new Date(c.created_at).toLocaleString()}
+            {c.displayName} <PoapBadgeForAddress address={c.author} size={12} />{" "}
+            • {new Date(c.created_at).toLocaleString()}
           </p>
           <div className="text-sm">
             <ReactMarkdown
