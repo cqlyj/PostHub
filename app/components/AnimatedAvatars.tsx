@@ -5,31 +5,22 @@ const AVATARS = [
   {
     src: "/avatar1-clean.png",
     style: {
-      top: "10%",
-      left: "5%",
-      width: "90px",
-      height: "90px",
+      top: "40px", // lowered again
+      left: "10%",
+      width: "110px",
+      height: "110px",
       animationDelay: "0s",
     } as React.CSSProperties,
   },
   {
     src: "/avatar2-clean.png",
     style: {
-      top: "8%",
-      right: "3%",
-      width: "110px",
-      height: "110px",
-      animationDelay: "1.5s",
-    } as React.CSSProperties,
-  },
-  {
-    src: "/avatar3-clean.png",
-    style: {
-      bottom: "12%",
-      left: "40%",
-      width: "100px",
-      height: "100px",
-      animationDelay: "3s",
+      top: "20px", // lowered again for center cat
+      left: "50%",
+      transform: "translateX(-50%)",
+      width: "120px",
+      height: "120px",
+      animationDelay: "1.2s",
     } as React.CSSProperties,
   },
 ];
